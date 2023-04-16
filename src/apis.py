@@ -3,11 +3,10 @@
 import json
 from datetime import timezone
 from io import StringIO
-from urllib.request import urlopen, Request
 
 import pandas as pd
 import requests
-import helpers as h
+from src import helpers as h
 
 NUM_API_CALLS = 0
 
@@ -89,11 +88,10 @@ def url_response(url, header=None):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; '
                              'rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'}
     headers.update(header)
-    request = Request(url, None, headers)
-    raw_string = urlopen(request).read().decode()
+    response_text = requests.request("GET", url, headers=headers).text
     global NUM_API_CALLS
     NUM_API_CALLS += 1
-    return raw_string
+    return response_text
 
 
 def get_raw_expenses_splitwise(token, min_date, max_date):

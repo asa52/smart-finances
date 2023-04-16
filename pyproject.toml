@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "smart-finances"
+version = "0.1.0"
+description = "Aggregate data from various expense and investment APIs to see all your finances succinctly."
+authors = ["Abhishek Ambekar <a-ambekar@hotmail.co.uk>"]
+readme = "README.md"
+packages = [{include = "smart_finances"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.24.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

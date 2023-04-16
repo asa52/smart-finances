@@ -12,9 +12,16 @@ DEFAULT_START_DATE = "2017-09-01"
 DEFAULT_CURRENCY = "GBP"
 
 
-def get_excel_table(excel_file_path, sheet_name):
+class NoDataWarning(Warning):
+    pass
+
+
+def get_excel_table(excel_file_path, sheet_name, header=2):
     excel_table = pd.read_excel(excel_file_path, sheet_name=sheet_name,
-                                header=2)
+                                header=header)
+    if len(excel_table.index) == 0:
+        raise NoDataWarning(f'No data in excel workbook {excel_file_path}, '
+                            f'sheet {sheet_name}')
     excel_table['Date'] = excel_table['Date'].dt.date
     excel_table.sort_values('Date', inplace=True)
     return excel_table

@@ -7,11 +7,11 @@ def main():
     params = h.load_yaml("parameters.yaml")
 
     # Download and currency convert expenses from Splitwise.
-    #process.expenses_to_df(
-    #    params['user_id'], params['exchange_rates_token'],
-    #    params['splitwise_token'], params['root_path']+params['expenses_file'],
-    #    params['root_path']+params['exchange_rate_file'], start_date=params[
-    #    'start_date'])
+    process.expenses_to_df(
+        params['user_id'], params['exchange_rates_token'],
+        params['splitwise_token'], params['root_path']+params['expenses_file'],
+        params['root_path']+params['exchange_rate_file'], start_date=params[
+        'start_date'])
 
     # Update investment values.
     #investments_data = process.update_investment_values(

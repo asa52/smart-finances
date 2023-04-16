@@ -28,7 +28,7 @@ def combine_dataframes(income, expenses, pension):
     :return:
     """
 
-    pension_reordered = _reformat_pension_df(pension)
+    pension_reordered = reformat_pension_df(pension)
 
     # Reformat expenses correctly.
     expenses['Owed'] = expenses['Owed'].astype(np.float)
@@ -59,7 +59,7 @@ def combine_dataframes(income, expenses, pension):
     return combined
 
 
-def _reformat_pension_df(pension):
+def reformat_pension_df(pension):
     # Reformat pension data to fit into incomes.
     pension.loc[:, 'Amount in'] = pension.loc[:, 'Amount in'].fillna(0)
     pension.loc[:, 'Amount out'] = pension.loc[:, 'Amount out'].fillna(0)

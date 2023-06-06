@@ -53,7 +53,7 @@ def combine_dataframes(income, expenses, pension):
                                           'To account']]
     expenses_reordered.loc[:, 'Type'] = 'Expense'
     expenses_reordered.loc[:, 'From account'] = np.nan
-    expenses.to_excel('test.xlsx')
+    expenses.to_excel('existing_categories.xlsx')
     # Combine and sort
     combined = pd.concat([income, expenses_reordered, pension_reordered],
                          ignore_index=True, sort=False)

@@ -78,12 +78,12 @@ def currency_convert(transactions, token, exchange_rate_file,
         date_curr = filter_by_date.index[0]
         symbols = list(filter_by_date['Currency Code'])
         rates.append([date_curr, *apis.get_exchange_rates(
-            symbols, d, token, base=default_curr)[0]])
+            symbols, d.strftime(h.DEFAULT_DATESTR_FORMAT), token, base=default_curr)[0]])
 
     new_rates = pd.DataFrame(rates, columns=[
         'Date_Curr', 'Date', 'Currency Code', 'Rate/Base'])
     new_rates.set_index('Date_Curr', inplace=True)
-    new_rates.to_csv(exchange_rate_file, mode='a', header=False)
+    new_rates.to_csv(exchange_rate_file, mode='a', header=False, lineterminator='\n')
 
     all_rates = pd.concat([old_rates, new_rates])
 

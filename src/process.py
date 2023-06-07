@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 
 from collections import OrderedDict, namedtuple
 import pandas as pd
@@ -7,101 +7,7 @@ from os.path import isfile
 
 import apis
 import helpers as h
-
-
-def expenses_to_df(user_id, forex_token, splitwise_token, output_file,
-                   exchange_rate_file, start_date=h.DEFAULT_START_DATE):
-    """Get all transactions for a specific person, checking that they
-    have not been deleted, as a DataFrame."""
-    dates = h.get_year_bound_dates(start_date)
-    raw_expenses = []
-    for boundary in dates:
-        raw_expenses += apis.get_raw_expenses_splitwise(splitwise_token,
-                                                        *boundary)
-
-    my_expenses = []
-    for expense in raw_expenses:
-        if expense['deleted_at'] is None and not expense['payment']:
-            # Ensure the transaction has not been deleted and is not a payback.
-            for users in expense['users']:
-                if int(users['user']['id']) == user_id:
-                    my_expenses.append(
-                        [str(expense['id']),
-                         datetime.fromisoformat(expense['date'][:-1]),
-                         expense['description'], expense['category']['name'],
-                         h.find_account_in_text(str(expense['details'])),
-                         expense['currency_code'], users['owed_share'],
-                         users['paid_share'], str(expense['group_id']),
-                         'Expense', str(expense['details'])
-                         ])
-                    break
-
-    expenses_df = pd.DataFrame(my_expenses, columns=[
-        'ExpenseID', 'Date', 'Description', 'Sub-subcategory', 'To account',
-        'Currency Code', 'Owed', 'Paid', 'GroupID', 'Category', 'Details'])
-    expenses_df.set_index('ExpenseID', inplace=True)
-
-    # Convert currencies
-    expenses_df = currency_convert(expenses_df, forex_token, exchange_rate_file)
-    expenses_df.sort_values('Date', inplace=True)
-
-    expenses_df.to_csv(output_file)
-    return expenses_df
-
-
-def currency_convert(transactions, token, exchange_rate_file,
-                     default_curr=h.DEFAULT_CURRENCY):
-    """Convert the foreign transactions into the default currency."""
-
-    # Get the foreign transactions, and those with unique date-currency pairs.
-    # Compare the number of foreign expenses to what currencies.csv says.
-    # get all foreign transactions, and group into unique date-currency pairs.
-    # todo only put new transactions through this system. put old
-    #  transactions into a csv to read from.
-    transactions.loc[:, 'Owed'] = pd.to_numeric(transactions.loc[:, 'Owed'])
-    transactions.loc[:, 'Date'] = pd.to_datetime(
-        transactions.loc[:, 'Date']).dt.date
-    transactions['Date_Curr'] = transactions['Date'].astype(str) + '_' + \
-                                transactions['Currency Code']
-
-    foreign_trns = transactions.loc[transactions['Currency Code'] !=
-                                    default_curr, :]
-    unique_date_currs = foreign_trns.drop_duplicates('Date_Curr')[
-        ['Date_Curr', 'Date', 'Currency Code']]
-    unique_date_currs.set_index('Date_Curr', inplace=True)
-    new_date_currs, old_rates = h.extra_df_entries(
-        exchange_rate_file, unique_date_currs, 'Date_Curr')
-    unique_dates = new_date_currs.Date.unique()
-    rates = []
-    for d in unique_dates:
-        filter_by_date = new_date_currs.loc[new_date_currs.Date == d]
-        date_curr = filter_by_date.index[0]
-        symbols = list(filter_by_date['Currency Code'])
-        rates.append([date_curr, *apis.get_exchange_rates(
-            symbols, d.strftime(h.DEFAULT_DATESTR_FORMAT), token, base=default_curr)[0]])
-
-    new_rates = pd.DataFrame(rates, columns=[
-        'Date_Curr', 'Date', 'Currency Code', 'Rate/Base'])
-    new_rates.set_index('Date_Curr', inplace=True)
-    new_rates.to_csv(exchange_rate_file, mode='a', header=False, lineterminator='\n')
-
-    all_rates = pd.concat([old_rates, new_rates])
-
-    # Do currency conversions to GBP on the foreign transactions.
-    foreign_trns = foreign_trns.merge(all_rates['Rate/Base'],
-                                      on=None, how='left', left_on='Date_Curr',
-                                      right_index=True)
-    foreign_trns['Amount'] = foreign_trns['Owed'] / foreign_trns['Rate/Base']
-    foreign_trns.drop(columns=['Rate/Base'], inplace=True)
-
-    local_trns = transactions.loc[transactions['Currency Code'] ==
-                                  default_curr, :]
-    local_trns['Amount'] = local_trns['Owed']
-
-    transactions = pd.concat([local_trns, foreign_trns], sort=True)
-    transactions.drop(columns=['Date_Curr'], inplace=True)
-    return transactions
-
+import src
 
 Fund = namedtuple('Fund', ['ticker', 'unit_price_history_df'])
 
@@ -125,7 +31,7 @@ def update_investment_values(eodhd_api_token, save_loc_path,
         fname = f'{save_loc_path}{investment.Ticker}-{investment.Name}.csv'
         if isfile(fname):
             old_data = pd.read_csv(fname)
-            old_data.Date = pd.to_datetime(old_data.Date, format=h.DEFAULT_DATESTR_FORMAT).dt.date
+            old_data.Date = pd.to_datetime(old_data.Date, format=src.DEFAULT_DATESTR_FORMAT).dt.date
             latest_date = old_data.Date.max() + timedelta(days=1)
             if latest_date < date.today() and not force_read_old_data:
                 new_data = get_ticker[investment.Source](

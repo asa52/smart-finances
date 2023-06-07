@@ -1,11 +1,12 @@
 """Functions to call various APIs."""
 
-import json
 from datetime import timezone
 from io import StringIO
 
 import pandas as pd
 import requests
+
+import src
 from src import helpers as h
 
 
@@ -44,21 +45,7 @@ class APICall(object):
         return pd.read_csv(StringIO(response_text))
 
 
-def get_exchange_rates(symbols, date_str, token, base=h.DEFAULT_CURRENCY):
-    """Get the exchange rate to convert from the currency given by 'symbol' to
-    the base currency. If a date dt is specified, find the rate at the latest
-    available date before or equal to the given date."""
-
-    symbols = '%2C'.join(symbols)
-    url = f"https://api.apilayer.com/exchangerates_data/{date_str}?symbols" \
-          f"={symbols}&base={base}"
-    header = {"apikey": token}
-    exchange_rates_api_caller = APICall(url, header=header)
-    rates = json.loads(exchange_rates_api_caller.make_api_call())['rates']
-    return [[date_str, curr, rates[curr]] for curr in rates.keys()]
-
-
-def get_monthly_inflation(output_file, min_date=h.DEFAULT_START_DATE):
+def get_monthly_inflation(output_file, min_date=src.DEFAULT_START_DATE):
     """Get monthly inflation rate as a dataframe for all dates >= min_date."""
     url = 'https://www.ons.gov.uk/generator?format=csv&uri=/economy/inflation' \
           'andpriceindices/timeseries/l55o/mm23'
@@ -107,22 +94,3 @@ def get_ticker_values_eodhd(api_token, ticker, min_date, max_date=None):
         df.drop(columns=['Open', 'Close', 'High', 'Low', 'Volume'], inplace=True)
         df.rename(columns={'Adjusted_close': 'Adj Close'}, inplace=True)
     return df
-
-
-def get_raw_expenses_splitwise(token, min_date, max_date):
-    """Get a list of expenses from Splitwise API after a certain date,
-    for the user specified by token. Obtain token from 'API keys' in
-    https://secure.splitwise.com/oauth_clients/1459."""
-
-    url = "https://www.splitwise.com/api/v3.0/get_expenses"
-    params = {"dated_after": min_date, "dated_before": max_date, "limit": "0"}
-    headers = {'Authorization': f"Bearer {token}",
-               'Accept': "*/*",
-               'Cache-Control': "no-cache",
-               'Host': "www.splitwise.com",
-               'accept-encoding': "gzip, deflate",
-               'Connection': "keep-alive"}
-
-    splitwise_api_caller = APICall(url, header=headers, params=params)
-    expenses_list = json.loads(splitwise_api_caller.make_api_call())['expenses']
-    return expenses_list

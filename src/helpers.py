@@ -1,19 +1,13 @@
 import codecs
 import json
 import re
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 
 import numpy as np
 import pandas as pd
 import yaml
 
-DEFAULT_DATESTR_FORMAT = "%Y-%m-%d"
-DEFAULT_START_DATE = "2017-09-01"
-DEFAULT_CURRENCY = "GBP"
-
-
-class NoDataWarning(Warning):
-    pass
+from src import DEFAULT_DATESTR_FORMAT, NoDataWarning
 
 
 def get_excel_table(excel_file_path, sheet_name, header=2):
@@ -112,31 +106,6 @@ def make_default_datestr_format(dt=None):
         return dt.strftime(DEFAULT_DATESTR_FORMAT)
     else:
         raise AssertionError('dt is not of a valid type.')
-
-
-def find_account_in_text(details):
-    """Read the account the payment was taken from by searching within
-    details."""
-    if re.search(re.compile('paypal', flags=re.IGNORECASE), details):
-        details = 'PayPal'
-    else:
-        details = 'Current'
-    return details
-
-
-def get_year_bound_dates(start_date_str):
-    """Returns start and end dates for the year between start_date and
-    today's date."""
-    today = date.today()
-    start_date = datetime.strptime(start_date_str, DEFAULT_DATESTR_FORMAT)
-    years_since_start = [i for i in range(start_date.year + 1, today.year)]
-
-    boundary_dates = [(start_date_str, f'{start_date.year}-12-31')]
-    for year in years_since_start:
-        boundary_dates.append((f'{year}-01-01', f'{year}-12-31'))
-    boundary_dates.append((f'{today.year}-01-01', datetime.strftime(
-        today + timedelta(days=1), DEFAULT_DATESTR_FORMAT)))
-    return boundary_dates
 
 
 def read_expenses(json_file_path):

@@ -1,6 +1,5 @@
 """Test functions in apis.py"""
-
-from src import helpers
+from src import helpers, expenses, NoDataWarning
 import pytest
 
 TEST_DATA_PATH = 'tests/test_data/'
@@ -11,12 +10,12 @@ TEST_DATA_PATH = 'tests/test_data/'
                           ("546%^%&* O*&  @M@JJ *(Y", "Current"),
                           ("p a y p a l", "Current")])
 def test_find_account_in_test(input_details, expected_output):
-    assert helpers.find_account_in_text(input_details) == expected_output
+    assert expenses.determine_account_from_details(input_details) == expected_output
 
 
 @pytest.mark.parametrize("excel_file_path, sheet_name, output",
                          [("NoDatesInDateCol.xlsx", "Sheet2", AttributeError),
-                          ("EmptyTable.xlsx", "Sheet1", helpers.NoDataWarning)])
+                          ("EmptyTable.xlsx", "Sheet1", NoDataWarning)])
 def test_get_excel_table(excel_file_path, sheet_name, output):
     """Test if date column doesn't exist, date column doesn't contain dates."""
     with pytest.raises(output):

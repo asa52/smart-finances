@@ -1,13 +1,14 @@
 import process
 import apis
 import helpers as h
+import expenses
 
 
 def main():
     params = h.load_yaml("parameters.yaml")
 
     # Download and currency convert expenses from Splitwise.
-    process.expenses_to_df(
+    expenses.expenses_to_df(
         params['user_id'], params['exchange_rates_token'],
         params['splitwise_token'], params['root_path']+params['expenses_file'],
         params['root_path']+params['exchange_rate_file'], start_date=params[

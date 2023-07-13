@@ -7,7 +7,7 @@ from os.path import isfile
 
 import apis
 import helpers as h
-import src
+from src import DEFAULT_DATESTR_FORMAT
 
 Fund = namedtuple('Fund', ['ticker', 'unit_price_history_df'])
 
@@ -31,7 +31,7 @@ def update_investment_values(eodhd_api_token, save_loc_path,
         fname = f'{save_loc_path}{investment.Ticker}-{investment.Name}.csv'
         if isfile(fname):
             old_data = pd.read_csv(fname)
-            old_data.Date = pd.to_datetime(old_data.Date, format=src.DEFAULT_DATESTR_FORMAT).dt.date
+            old_data.Date = pd.to_datetime(old_data.Date, format=DEFAULT_DATESTR_FORMAT).dt.date
             latest_date = old_data.Date.max() + timedelta(days=1)
             if latest_date < date.today() and not force_read_old_data:
                 new_data = get_ticker[investment.Source](

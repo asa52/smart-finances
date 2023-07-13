@@ -6,11 +6,12 @@ from io import StringIO
 import pandas as pd
 import requests
 
-import src
-from src import helpers as h
+from src import DEFAULT_START_DATE
+import helpers as h
 
 
 class APICallError(Exception):
+    """Raise if APICall class fails for any reason."""
     pass
 
 
@@ -45,19 +46,37 @@ class APICall(object):
         return pd.read_csv(StringIO(response_text))
 
 
-def get_monthly_inflation(output_file, min_date=src.DEFAULT_START_DATE):
+def get_monthly_inflation(output_file, min_date=DEFAULT_START_DATE):
     """Get monthly inflation rate as a dataframe for all dates >= min_date."""
     url = 'https://www.ons.gov.uk/generator?format=csv&uri=/economy/inflation' \
           'andpriceindices/timeseries/l55o/mm23'
     inflation_api_caller = APICall(url)
-    df = inflation_api_caller.response_to_df()
-    df.rename(columns={df.columns[0]: 'Date', df.columns[1]: 'InflationRate'},
-              inplace=True)
-    filtered_df_1 = df.loc[df.Date.str.contains('2\d{3} [A-Z]{3}')]
-    filtered_df_1.Date = pd.to_datetime(filtered_df_1.Date, format='%Y %b')
-    filtered_df_2 = filtered_df_1.loc[filtered_df_1.Date >= min_date]
-    filtered_df_2.to_csv(output_file, index=False)
-    return filtered_df_2
+    raw_df = inflation_api_caller.response_to_df()
+
+    year_month_regex = '2\d{3} [A-Z]{3}'
+    filtered = (raw_df
+                .loc[raw_df[raw_df.columns[0]].str.contains(year_month_regex)]
+                .rename(columns={raw_df.columns[0]: 'date',
+                                 raw_df.columns[1]: 'inflation_rate'})
+                .astype({'date': 'datetime64[ns]'})
+                .query(f'date >= "{min_date}"'))
+
+    filtered.to_csv(output_file, header=True, mode='w', index=False,
+                    lineterminator='\n', date_format='%Y-%m')
+    return filtered
+
+
+def get_ticker_values(source, ticker, min_date, max_date=None, api_token=None):
+
+    assert source == 'YF' or source == 'EODHD', f'Invalid source: {source}'
+
+    def get_ticker_eodhd_no_token(tick, start_date, end_date=None):
+        return get_ticker_values_eodhd(api_token, tick, start_date, end_date)
+
+    get_ticker = {'YF': get_ticker_values_yfinance,
+                  'EODHD': get_ticker_eodhd_no_token}
+
+    return get_ticker[source](ticker, min_date, max_date)
 
 
 def get_ticker_values_yfinance(ticker, min_date, max_date=None):
@@ -81,8 +100,7 @@ def get_ticker_values_yfinance(ticker, min_date, max_date=None):
 def get_ticker_values_eodhd(api_token, ticker, min_date, max_date=None):
     """Gets the end of day historical data for the value of a ticker from
     min_date to max_date."""
-    min_date = h.make_default_datestr_format(min_date)
-    max_date = h.make_default_datestr_format(max_date)
+    min_date, max_date = map(h.make_default_datestr_format, [min_date, max_date])
 
     url = f'https://eodhistoricaldata.com/api/eod/{ticker}?api_token' \
           f'={api_token}&fmt=csv&period=d&from={min_date}&to={max_date}'

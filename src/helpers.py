@@ -114,15 +114,6 @@ def read_expenses(json_file_path):
     return content
 
 
-def extra_df_entries(df1_path, df2, col):
-    """Read in the csv from df1_path as a dataframe df1. Compare the 2 columns
-    compare_cols_pair in df1 to df2 and return the rows of df2 whose column
-    pairs do not appear in df2."""
-    df1 = pd.read_csv(df1_path, index_col=col)
-    new_rows = df2.loc[df2.index.difference(df1.index)]
-    return new_rows, df1
-
-
 def load_yaml(file_path):
     """Load yaml file and return resulting dictionary."""
     with open(file_path, "r") as f:

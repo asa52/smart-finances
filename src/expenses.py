@@ -2,13 +2,13 @@
 import json
 import re
 from datetime import date, datetime, timedelta
-from os.path import exists
+from os.path import isfile
 from typing import List
 
 import pandas as pd
 
 from src import DEFAULT_DATESTR_FORMAT, DEFAULT_CURRENCY, DEFAULT_START_DATE
-from src.apis import APICall
+from apis import APICall
 
 
 def get_raw_expenses_splitwise(token, min_date, max_date):
@@ -55,7 +55,7 @@ def get_owed_paid_shares_for_user(users: pd.Series, target_user_id: int,
         determine their specified share."""
         users_df = pd.json_normalize(users_details)
         record = users_df.loc[users_df['user.id'] == target_user_id]
-        return record[which_share].values[0] if len(record) != 0 else None
+        return record[which_share].values[0] if len(record) != 0 else 0.
 
     return users.map(get_correct_user_share)
 
@@ -90,7 +90,7 @@ def currency_convert(transactions, token, exchange_rate_file,
     date_curr_idx_name = 'date_curr'
     exchange_rate_column_names = [date_curr_idx_name, 'date', 'currency_code',
                                   'rate_per_base']
-    if not exists(exchange_rate_file):
+    if not isfile(exchange_rate_file):
         stored_exchange_rates = pd.DataFrame(columns=exchange_rate_column_names,
                                              ).set_index(date_curr_idx_name)
     else:
@@ -169,6 +169,8 @@ def expenses_to_df(user_id, forex_token, splitwise_token, output_file,
         .loc[:, ['date', 'description', 'category.name', 'currency_code',
                  'users', 'group_id', 'details']])
 
+    expense_categories = pd.read_csv('../data/expenses_categories.csv', index_col='sub_subcategory', header=0).astype(
+        {'subcategory': 'category'})
     converted_expenses = (
         filtered_expenses
         .assign(date=pd.to_datetime(filtered_expenses.date, format='ISO8601').dt.tz_localize(None),
@@ -176,13 +178,17 @@ def expenses_to_df(user_id, forex_token, splitwise_token, output_file,
                 category='Expense',
                 group_id=filtered_expenses.group_id.fillna(0),
                 owed=get_owed_paid_shares_for_user(filtered_expenses.users, user_id, 'owed_share'),
-                paid=get_owed_paid_shares_for_user(filtered_expenses.users, user_id, 'paid_share'))
-        .dropna(subset=['owed']).drop(columns=['users'])
-        .astype({'category': 'category', 'category.name': 'category',
-                 'group_id': 'int', 'currency_code': 'category',
-                 'account': 'category', 'owed': 'float', 'paid': 'float'})
+                paid=get_owed_paid_shares_for_user(filtered_expenses.users, user_id, 'paid_share'),
+                details=filtered_expenses.details.str.replace('\n', ' ', regex=True))
+        .drop(columns=['users'])
         .rename(columns={'category.name': 'sub_subcategory'})
+        .astype({'category': 'category', 'sub_subcategory': 'category',
+                 'group_id': 'int',
+                 'currency_code': 'category', 'account': 'category',
+                 'owed': 'float', 'paid': 'float'})
+        .query("`owed` > 0")
         .sort_values('date')
+        .join(expense_categories, on='sub_subcategory', how='left')
         .pipe((currency_convert, 'transactions'), token=forex_token,
               exchange_rate_file=exchange_rate_file)
     )

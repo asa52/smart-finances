@@ -18,6 +18,8 @@ pytest-benchmark = "^4.0.0"
 dash = "^2.11.1"
 dash-bootstrap-components = "^1.4.2"
 dash-bootstrap-templates = "^1.0.8"
+pylint = "^2.17.5"
+dash-auth = "^2.0.0"
 
 
 [build-system]

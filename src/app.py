@@ -11,7 +11,7 @@ from dash.dash_table.Format import Format, Group, Scheme, Symbol
 JOINER_CHAR = '/'
 DATE_COLUMN_TITLE = 'Date'
 
-df = pd.read_csv('..\expenses.csv')
+df = pd.read_csv(r'..\expenses.csv')
 df = (df.assign(date=pd.to_datetime(df.date))
       .rename(columns={'date': DATE_COLUMN_TITLE}))
 
@@ -131,7 +131,7 @@ def update_expense_pivottable(time_grouping_format: str,
         column_details['format'] = Format(
             scheme=Scheme.fixed, precision=2, group=Group.yes, groups=3,
             group_delimiter=',', decimal_delimiter='.', symbol=Symbol.yes,
-            symbol_prefix=u'£')
+            symbol_prefix='£')
         column_formats.append(column_details)
 
     if expense_category_format == EXPENSE_CATEGORY_OPTIONS.loc['by_subcategory', 'option_name']:

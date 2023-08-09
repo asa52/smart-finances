@@ -1,7 +1,7 @@
 """Define the dashboard app layout."""
 
 from collections import namedtuple
-from typing import Tuple
+from typing import Tuple, Iterable
 
 import dash_auth
 import dash_bootstrap_components as dbc
@@ -78,7 +78,7 @@ def main(expenses_df: pd.DataFrame):
 def update_expense_pivottable(
         time_grouping_format: str, expense_category_format: str,
         filter_by_group: str) -> (Tuple[Figure, Figure, dash_table.DataTable,
-                                        dash_table.DataTable]):
+dash_table.DataTable]):
     """Callback to update expense graphs and tables based on dropdowns.
     @param time_grouping_format: One of valid TIME_GROUP_FORMATS.
     @param expense_category_format: Either Category or Subcategory,
@@ -125,8 +125,11 @@ def update_expense_pivottable(
             add_row_totals.loc[:, DATE_COLUMN_TITLE].dt.strftime(
                 date_string_format[time_grouping_format]))
 
-    column_formats = []
+    def join_columns(column_names: Iterable[str]) -> str:
+        return column_names[0] if column_names[-1] == '' else JOINER_CHAR.join(
+            column_names)
 
+    column_formats = []
     for column_name in add_row_totals.columns:
         # If 'Subcategory' category format is chosen, column names will be
         # tuples of length 2. The 2nd element in the DATE_COLUMN_TITLE column
@@ -134,7 +137,7 @@ def update_expense_pivottable(
         if expense_category_format == EXPENSE_CATEGORY_OPTIONS.loc[
             'by_subcategory', 'option_name']:
             column_details = {"name": column_name,
-                              "id": JOINER_CHAR.join(column_name)}
+                              "id": join_columns(column_name)}
             if column_name[0] != DATE_COLUMN_TITLE:
                 column_details['type'] = 'numeric'
         else:
@@ -150,8 +153,8 @@ def update_expense_pivottable(
 
     if expense_category_format == EXPENSE_CATEGORY_OPTIONS.loc[
         'by_subcategory', 'option_name']:
-        # todo add exceptions here for Date/ and Total/ columns
-        add_row_totals.columns = add_row_totals.columns.map(JOINER_CHAR.join)
+        add_row_totals.columns = add_row_totals.columns.map(
+            join_columns)
 
     expenses_df = (
         filtered_expenses
@@ -177,11 +180,17 @@ def update_expense_pivottable(
                                              'records'), **table_format)
     expense_list = dash_table.DataTable(data=expenses_df.to_dict('records'),
                                         **table_format)
-
+    if expense_category_format == EXPENSE_CATEGORY_OPTIONS.loc[
+        'by_subcategory', 'option_name']:
+        color = EXPENSE_CATEGORY_OPTIONS.loc[
+            'by_subcategory', 'df_column_name']
+    else:
+        color = EXPENSE_CATEGORY_OPTIONS.loc[
+            'by_category', 'df_column_name']
     graph_format = {'data_frame': df_for_graphs, 'x': DATE_COLUMN_TITLE,
                     'y': 'amount', 'line_group': 'subcategory',
-                    'color': 'subcategory', 'hover_name': 'Date',
-                    'hover_data': 'amount'}
+                    'color': color,
+                    'hover_name': 'Date', 'hover_data': 'amount'}
     absolute_fig = px.area(**graph_format,
                            range_y=[0, min(5000, max(add_row_totals.Total))])
     relative_fig = px.area(**graph_format, groupnorm='percent')

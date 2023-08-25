@@ -24,6 +24,7 @@ mypy = "^1.4.1"
 pandas-stubs = "^2.0.2.230605"
 types-pyyaml = "^6.0.12.11"
 types-requests = "^2.31.0.2"
+black = "^23.7.0"
 
 
 [build-system]

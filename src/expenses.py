@@ -226,9 +226,8 @@ def expenses_to_df(
     ).astype({"subcategory": "category"})
     converted_expenses = (
         filtered_expenses.assign(
-            date=pd.to_datetime(
-                filtered_expenses.date, format="ISO8601"
-            ).dt.tz_localize(None),
+            date=pd.to_datetime(filtered_expenses.date,
+                                format="ISO8601").dt.tz_localize(None),
             account=determine_account_from_details(filtered_expenses.details),
             category="Expense",
             group_id=filtered_expenses.group_id.fillna(0),

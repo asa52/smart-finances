@@ -8,7 +8,7 @@ packages = [{include = "smart_finances"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pandas = "^2.0.0"
+pandas = "2.0.0"
 pyyaml = "^6.0"
 requests = "^2.28.2"
 pytest = "^7.3.1"

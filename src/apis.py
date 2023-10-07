@@ -27,10 +27,11 @@ class APICall(object):
         self.header = self.__class__.DEFAULT_HEADER | header
         self.params = params
 
+    @staticmethod
     def empty_dict(*args):
         """Create an empty dict for every arg in args that is None.
         Otherwise, return the arg unchanged."""
-        return [dict() if arg is None else arg for arg in args[1:]]
+        return [dict() if arg is None else arg for arg in args]
 
     def make_api_call(self):
         response = requests.request("GET", self.url, headers=self.header,

@@ -26,7 +26,6 @@ def main():
 
     #t = h.get_excel_table('../data/Master 8 - Copy.xlsm', 'Input - S&S ISA')
     #process.calculate_platform_history(t, investments_data)
-    print(2)
 
 
 if __name__ == '__main__':

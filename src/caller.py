@@ -14,6 +14,7 @@ def main():
         params["splitwise_token"],
         params["root_path"] + params["expenses_file"],
         params["root_path"] + params["exchange_rate_file"],
+        params["root_path"] + params["expense_categories_file"],
         start_date=params["start_date"],
     )
 

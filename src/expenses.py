@@ -196,6 +196,7 @@ def expenses_to_df(
     splitwise_token,
     output_file,
     exchange_rate_file,
+    expense_categories_file,
     start_date=DEFAULT_START_DATE,
 ):
     """Get all transactions for a specific person, checking that they
@@ -222,7 +223,7 @@ def expenses_to_df(
     ]
 
     expense_categories = pd.read_csv(
-        "../data/expenses_categories.csv", index_col="sub_subcategory", header=0
+        expense_categories_file, index_col="sub_subcategory", header=0
     ).astype({"subcategory": "category"})
     converted_expenses = (
         filtered_expenses.assign(

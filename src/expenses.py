@@ -3,15 +3,16 @@ import json
 import re
 from datetime import date, datetime, timedelta
 from os.path import isfile
-from typing import List
+from typing import List, Tuple
+import argparse
 
 import pandas as pd
 
 from src import DEFAULT_DATESTR_FORMAT, DEFAULT_CURRENCY, DEFAULT_START_DATE
 from src.apis import APICall
+from src.helpers import load_yaml
 
-
-def get_raw_expenses_splitwise(token, min_date, max_date):
+def get_raw_expenses_splitwise(token: str, min_date: str, max_date: str) -> list:
     """Get a list of expenses from Splitwise API after a certain date,
     for the user specified by token. Obtain token from 'API keys' in
     https://secure.splitwise.com/oauth_clients/1459."""
@@ -32,27 +33,25 @@ def get_raw_expenses_splitwise(token, min_date, max_date):
     return expenses_list
 
 
-def get_exchange_rates(symbols, date_str, token, base=DEFAULT_CURRENCY):
+def get_exchange_rates(symbols: List[str], conversion_date: str, token: str, base: str = DEFAULT_CURRENCY) -> List[list]:
     """Get the exchange rate to convert from the currency given by 'symbol' to
-    the base currency. If a date dt is specified, find the rate at the latest
+    the base currency. If a date is specified, find the rate at the latest
     available date before or equal to the given date."""
 
     symbols = "%2C".join(symbols)
     url = (
-        f"https://api.apilayer.com/exchangerates_data/{date_str}?symbols"
+        f"https://api.apilayer.com/exchangerates_data/{conversion_date}?symbols"
         f"={symbols}&base={base}"
     )
     header = {"apikey": token}
     exchange_rates_api_caller = APICall(url, header=header)
     rates = json.loads(exchange_rates_api_caller.make_api_call())["rates"]
     return [
-        [f"{date_str}_{curr}", date_str, curr, rates[curr]] for curr in rates.keys()
+        [f"{conversion_date}_{curr}", conversion_date, curr, rates[curr]] for curr in rates.keys()
     ]
 
 
-def get_owed_paid_shares_for_user(
-    users: pd.Series, target_user_id: int, which_share: str
-) -> pd.Series:
+def get_owed_paid_shares_for_user(users: pd.Series, target_user_id: int, which_share: str) -> pd.Series:
     """Get the owed and paid shares from the users series, which contains a list
     of dictionaries with user details per row."""
 
@@ -66,14 +65,14 @@ def get_owed_paid_shares_for_user(
     return users.map(get_correct_user_share)
 
 
-def get_year_bound_dates(start_date_str):
+def get_year_bound_dates(start_date: str) -> List[Tuple[str, str]]:
     """Returns start and end dates for the year between start_date and
     today's date."""
     today = date.today()
-    start_date = datetime.strptime(start_date_str, DEFAULT_DATESTR_FORMAT)
+    start_date = datetime.strptime(start_date, DEFAULT_DATESTR_FORMAT)
     years_since_start = list(range(start_date.year + 1, today.year))
 
-    boundary_dates = [(start_date_str, f"{start_date.year}-12-31")]
+    boundary_dates = [(start_date, f"{start_date.year}-12-31")]
     for year in years_since_start:
         boundary_dates.append((f"{year}-01-01", f"{year}-12-31"))
     boundary_dates.append(
@@ -93,8 +92,8 @@ def determine_account_from_details(details: pd.Series) -> pd.Series:
 
 
 def currency_convert(
-    transactions, token, exchange_rate_file, default_curr=DEFAULT_CURRENCY
-):
+    transactions: pd.DataFrame, token: str, exchange_rate_file: str, default_curr: str = DEFAULT_CURRENCY
+) -> pd.DataFrame:
     """Convert the foreign transactions into the default currency, updating
     the exchange rate file with new date-currency conversions."""
 
@@ -264,3 +263,21 @@ def expenses_to_df(
     )
     converted_expenses.to_csv(output_file)
     return converted_expenses
+
+
+def main():
+    """Get parameters file path and use this to download expenses from splitwise as CSVs."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("parameters_file", help="Path to YAML file specifying parameters")
+    params_file_path = parser.parse_args().parameters_file
+
+    params = load_yaml(params_file_path)
+
+    # Download and currency convert expenses from Splitwise.
+    expenses_to_df(params["user_id"], params["exchange_rates_token"], params["splitwise_token"],
+                   params["root_path"] + params["expenses_file"], params["root_path"] + params["exchange_rate_file"],
+                   params["root_path"] + params["expense_categories_file"], start_date=params["start_date"])
+
+
+if __name__ == '__main__':
+    main()

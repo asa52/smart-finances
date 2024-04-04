@@ -10,11 +10,13 @@ import yaml
 from src import DEFAULT_DATESTR_FORMAT, NoDataWarning
 
 
-def get_excel_table(excel_file_path, sheet_name, header=2):
-    excel_table = pd.read_excel(excel_file_path, sheet_name=sheet_name, header=header)
+def get_excel_table(excel_file_path: str, sheet_name: str,
+                    header: int = 2) -> pd.DataFrame:
+    excel_table = pd.read_excel(excel_file_path, sheet_name=sheet_name,
+                                header=header)
     if len(excel_table.index) == 0:
         raise NoDataWarning(
-            f"No data in excel workbook {excel_file_path}, " f"sheet {sheet_name}"
+            f"No data in excel workbook {excel_file_path}, sheet {sheet_name}"
         )
     excel_table["Date"] = excel_table["Date"].dt.date
     excel_table.sort_values("Date", inplace=True)
@@ -131,7 +133,7 @@ def load_yaml(file_path):
     return data
 
 
-def lookup_unit_price(value_date: datetime.date, fund_name: str, funds_dict: dict):
+def lookup_unit_price(value_date: date, fund_name: str, funds_dict: dict):
     """Look up from funds_dict the unit price in GBP of the fund_name on the
     date closest to the value_date."""
     fund_value_df = funds_dict[fund_name].unit_price_history_df

@@ -1,4 +1,5 @@
 """Import, process and save expenses from Splitwise."""
+
 import json
 import re
 from datetime import date, datetime, timedelta
@@ -34,25 +35,30 @@ def get_raw_expenses_splitwise(token: str, min_date: str, max_date: str) -> list
     return raw_expenses
 
 
-def get_exchange_rates(symbols: List[str], conversion_date: str, token: str, base: str = DEFAULT_CURRENCY) -> List[list]:
+def get_exchange_rates(
+    symbols: List[str], conversion_date: str, token: str, base: str = DEFAULT_CURRENCY
+) -> List[list]:
     """Get the exchange rate to convert from the currency given by 'symbol' to
     the base currency. If a date is specified, find the rate at the latest
     available date before or equal to the given date."""
 
-    symbols = "%2C".join(symbols)
+    joined_symbols = "%2C".join(symbols)
     url = (
         f"https://api.apilayer.com/exchangerates_data/{conversion_date}?symbols"
-        f"={symbols}&base={base}"
+        f"={joined_symbols}&base={base}"
     )
     header = {"apikey": token}
     exchange_rates_api_caller = APICall(url, header=header)
     rates = json.loads(exchange_rates_api_caller.make_api_call())["rates"]
     return [
-        [f"{conversion_date}_{curr}", conversion_date, curr, rates[curr]] for curr in rates.keys()
+        [f"{conversion_date}_{curr}", conversion_date, curr, rates[curr]]
+        for curr in rates.keys()
     ]
 
 
-def get_owed_paid_shares_for_user(users: pd.Series, target_user_id: int, which_share: str) -> pd.Series:
+def get_owed_paid_shares_for_user(
+    users: pd.Series, target_user_id: int, which_share: str
+) -> pd.Series:
     """Get the owed and paid shares from the users series, which contains a list
     of dictionaries with user details per row."""
 
@@ -66,14 +72,14 @@ def get_owed_paid_shares_for_user(users: pd.Series, target_user_id: int, which_s
     return users.map(get_correct_user_share)
 
 
-def get_year_bound_dates(start_date: str) -> List[Tuple[str, str]]:
+def get_year_bound_dates(start_date_str: str) -> List[Tuple[str, str]]:
     """Returns start and end dates for the year between start_date and
     today's date."""
     today = date.today()
-    start_date = datetime.strptime(start_date, DEFAULT_DATESTR_FORMAT)
+    start_date = datetime.strptime(start_date_str, DEFAULT_DATESTR_FORMAT)
     years_since_start = list(range(start_date.year + 1, today.year))
 
-    boundary_dates = [(start_date, f"{start_date.year}-12-31")]
+    boundary_dates = [(start_date_str, f"{start_date.year}-12-31")]
     for year in years_since_start:
         boundary_dates.append((f"{year}-01-01", f"{year}-12-31"))
     boundary_dates.append(
@@ -93,35 +99,46 @@ def determine_account_from_details(details: pd.Series) -> pd.Series:
 
 
 def convert_foreign_transactions(
-    transactions: pd.DataFrame, forex_api_token: str, exchange_rate_file: str, default_curr: str = DEFAULT_CURRENCY
+    transactions: pd.DataFrame,
+    forex_api_token: str,
+    exchange_rate_file: str,
+    default_curr: str = DEFAULT_CURRENCY,
 ) -> pd.DataFrame:
     """Convert the foreign transactions into the default currency, updating
     the exchange rate file with new date-currency conversions."""
 
     # Obtain stored exchange rates
     index_column_name = "date_curr"
-    updated_exchange_rates = update_exchange_rate_records(transactions, forex_api_token, exchange_rate_file, index_column_name,
-                                                          default_curr=default_curr)
+    updated_exchange_rates = update_exchange_rate_records(
+        transactions,
+        forex_api_token,
+        exchange_rate_file,
+        index_column_name,
+        default_curr=default_curr,
+    )
 
     # Convert transactions to base currency by dividing by the corresponding
     # exchange rate. If no exchange rate found (i.e. transaction in base
     # currency anyway), use 1 as the conversion rate.
-    converted_transactions = (
-        transactions
-        .assign(amount=transactions.owed / transactions[index_column_name]
-                .map(updated_exchange_rates.rate_per_base)
-                .fillna(1))
-        .drop(columns=[index_column_name])
-    )
+    converted_transactions = transactions.assign(
+        amount=transactions.owed
+        / transactions[index_column_name]
+        .map(updated_exchange_rates.rate_per_base)
+        .fillna(1)
+    ).drop(columns=[index_column_name])
     return converted_transactions
 
 
-def update_exchange_rate_records(all_transactions: pd.DataFrame,
-                                 forex_api_token: str,
-                                 exchange_rate_file_path: str,
-                                 index_column_name: str,
-                                 default_curr: str = DEFAULT_CURRENCY):
-    """Update stored exchange rates to reflect additional foreign currency transactions that have been made."""
+def update_exchange_rate_records(
+    all_transactions: pd.DataFrame,
+    forex_api_token: str,
+    exchange_rate_file_path: str,
+    index_column_name: str,
+    default_curr: str = DEFAULT_CURRENCY,
+):
+    """Update stored exchange rates to reflect additional foreign currency
+    transactions that have been made.
+    """
 
     # Obtain stored exchange rates
     exchange_rate_column_names = [
@@ -140,7 +157,7 @@ def update_exchange_rate_records(all_transactions: pd.DataFrame,
             exchange_rate_file_path, index_col=index_column_name
         )
         assert (
-                existing_exchange_rates.columns == exchange_rate_column_names[1:]
+            existing_exchange_rates.columns == exchange_rate_column_names[1:]
         ).all(), (
             f"{exchange_rate_file_path} has incorrect format: "
             f"{existing_exchange_rates.columns} not {exchange_rate_column_names}."
@@ -153,13 +170,20 @@ def update_exchange_rate_records(all_transactions: pd.DataFrame,
     }
     existing_exchange_rates = existing_exchange_rates.astype(type_conversions)
 
-    # Determine the new date-currency pairs whose forex values need to be queried, by constructing a date-currency
-    # column for all transactions, dropping rows whose currency is the default (so doesn't need conversion) and dropping
-    # duplicate date-currency pairs. Find the difference between this and the existing exchange rates rows.
-    all_transactions[index_column_name] = (all_transactions.date.dt.date.astype(str) + "_" + all_transactions.currency_code.astype(str))
+    # Determine the new date-currency pairs whose forex values need to be queried,
+    # by constructing a date-currency column for all transactions, dropping rows
+    # whose currency is the default (so doesn't need conversion) and dropping
+    # duplicate date-currency pairs. Find the difference between this and the
+    # existing exchange rates rows.
+    all_transactions[index_column_name] = (
+        all_transactions.date.dt.date.astype(str)
+        + "_"
+        + all_transactions.currency_code.astype(str)
+    )
     date_currencies = (
-        all_transactions
-        .drop(all_transactions[all_transactions.currency_code == default_curr].index)
+        all_transactions.drop(
+            all_transactions[all_transactions.currency_code == default_curr].index
+        )
         .loc[:, exchange_rate_column_names[:-1]]
         .drop_duplicates(subset=[index_column_name])
         .set_index(index_column_name)
@@ -169,15 +193,15 @@ def update_exchange_rate_records(all_transactions: pd.DataFrame,
     ]
 
     if new_date_currencies.size > 0:
-        # Group requests by date because the API can return multiple currencies in a single query.
+        # Group requests by date because the API can return multiple currencies
+        # in a single query.
         forex_requests = (
-            new_date_currencies
-            .groupby(new_date_currencies.date.dt.date.astype(str))
+            new_date_currencies.groupby(new_date_currencies.date.dt.date.astype(str))
             .currency_code.apply(list)
             .reset_index()
         )
-        # Obtain a list of rates relative to the default for each date. Note that row.currency_code is a *list* of
-        # currencies.
+        # Obtain a list of rates relative to the default for each date. Note
+        # that row.currency_code is a *list* of currencies.
         rates_list = forex_requests.apply(
             lambda row: get_exchange_rates(
                 row.currency_code, row.date, forex_api_token, base=default_curr
@@ -185,7 +209,8 @@ def update_exchange_rate_records(all_transactions: pd.DataFrame,
             axis=1,
         )
 
-        # Store new exchange rates with the existing ones to avoid having to run the query again.
+        # Store new exchange rates with the existing ones to avoid having to run
+        # the query again.
         new_exchange_rates = pd.DataFrame.from_records(
             rates_list.explode(),
             index=index_column_name,
@@ -200,7 +225,7 @@ def update_exchange_rate_records(all_transactions: pd.DataFrame,
         # then overwrite existing exchange file with it to prevent needing to
         # sort later.
         all_exchange_rates.to_csv(
-            exchange_rate_file,
+            exchange_rate_file_path,
             mode="w",
             date_format=DEFAULT_DATESTR_FORMAT,
             header=True,
@@ -222,32 +247,46 @@ def expenses_to_csv(
     start_date=DEFAULT_START_DATE,
 ):
     """Get all transactions for a specific person, checking that they
-    have not been deleted, and save them to CSV."""
+    have not been deleted, and save them to CSV.
+    """
 
-    # Split API calls by year to avoid saturating data being sent in a single call.
+    # Split API calls by year to avoid saturating data being sent in a single
+    # call.
     dates = get_year_bound_dates(start_date)
     raw_expenses = []
     for boundary in dates:
         raw_expenses += get_raw_expenses_splitwise(splitwise_api_token, *boundary)
     raw_expenses_df = pd.json_normalize(raw_expenses).set_index("id")
 
-    # Filter expenses to ensure they are not deleted and are not records of payments between people
-    filtered_expenses = (
-        raw_expenses_df
-        .loc[raw_expenses_df.deleted_at.isna() & ~raw_expenses_df.payment]
-        .loc[:, ["date", "description", "category.name", "currency_code", "users", "group_id", "details"]]
-    )
+    # Filter expenses to ensure they are not deleted and are not records of
+    # payments between people
+    filtered_expenses = raw_expenses_df.loc[
+        raw_expenses_df.deleted_at.isna() & ~raw_expenses_df.payment
+    ].loc[
+        :,
+        [
+            "date",
+            "description",
+            "category.name",
+            "currency_code",
+            "users",
+            "group_id",
+            "details",
+        ],
+    ]
 
     expense_categories = pd.read_csv(
         expense_categories_file, index_col="sub_subcategory", header=0
     ).astype({"subcategory": "category"})
 
-    # Format the dates, record which account to debit from, change n/a group IDs (non group expenses) to 0, determine
-    # how much the user in question owes and paid, and change dtypes. Add a higher-level category column.
+    # Format the dates, record which account to debit from, change n/a group IDs
+    # (non group expenses) to 0, determine how much the user in question owes
+    # and paid, and change dtypes. Add a higher-level category column.
     converted_expenses = (
         filtered_expenses.assign(
-            date=pd.to_datetime(filtered_expenses.date,
-                                format="ISO8601").dt.tz_localize(None),
+            date=pd.to_datetime(
+                filtered_expenses.date, format="ISO8601"
+            ).dt.tz_localize(None),
             account=determine_account_from_details(filtered_expenses.details),
             category="Expense",
             group_id=filtered_expenses.group_id.fillna(0),
@@ -286,18 +325,28 @@ def expenses_to_csv(
 
 
 def main():
-    """Get parameters file path and use this to download expenses from splitwise as CSVs."""
+    """Get parameters file path and use this to download expenses from splitwise
+    as CSVs.
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument("parameters_file", help="Path to YAML file specifying parameters")
+    parser.add_argument(
+        "parameters_file", help="Path to YAML file specifying parameters"
+    )
     params_file_path = parser.parse_args().parameters_file
 
     params = load_yaml(params_file_path)
 
     # Download and currency convert expenses from Splitwise.
-    expenses_to_csv(params["user_id"], params["exchange_rates_token"], params["splitwise_token"],
-                    params["root_path"] + params["expenses_file"], params["root_path"] + params["exchange_rate_file"],
-                    params["root_path"] + params["expense_categories_file"], start_date=params["start_date"])
+    expenses_to_csv(
+        params["user_id"],
+        params["exchange_rates_token"],
+        params["splitwise_token"],
+        params["root_path"] + params["expenses_file"],
+        params["root_path"] + params["exchange_rate_file"],
+        params["root_path"] + params["expense_categories_file"],
+        start_date=params["start_date"],
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

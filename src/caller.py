@@ -8,7 +8,7 @@ def main():
     params = h.load_yaml("parameters.yaml")
 
     # Download and currency convert expenses from Splitwise.
-    expenses.expenses_to_df(
+    expenses.expenses_to_csv(
         params["user_id"],
         params["exchange_rates_token"],
         params["splitwise_token"],

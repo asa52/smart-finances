@@ -1,5 +1,6 @@
 """Define the dashboard app layout."""
 
+import argparse
 from collections import namedtuple
 from typing import Tuple, Iterable
 
@@ -301,7 +302,13 @@ def update_expense_pivottable(
 
 
 if __name__ == "__main__":
-    df = pd.read_csv(r"..\expenses.csv")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "expenses_file", help="Path to CSV file specifying expenses"
+    )
+    data_file_path = parser.parse_args().expenses_file
+
+    df = pd.read_csv(data_file_path)
     df = df.assign(date=pd.to_datetime(df.date)).rename(
         columns={"date": DATE_COLUMN_TITLE}
     )

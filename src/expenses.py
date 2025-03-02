@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from os.path import isfile
 from typing import List, Tuple
 import argparse
+from pprint import pprint
 
 import pandas as pd
 
@@ -33,6 +34,29 @@ def get_raw_expenses_splitwise(token: str, min_date: str, max_date: str) -> list
     splitwise_api_caller = APICall(url, header=headers, params=params)
     raw_expenses = json.loads(splitwise_api_caller.make_api_call())["expenses"]
     return raw_expenses
+
+
+def get_expense_groups(token: str, expense_groups_file: str) -> pd.DataFrame:
+    """Get a list of expenses from Splitwise API after a certain date,
+    for the user specified by token. Obtain token from 'API keys' in
+    https://secure.splitwise.com/oauth_clients/1459."""
+
+    url = "https://www.splitwise.com/api/v3.0/get_groups"
+    params = {}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "*/*",
+        "Cache-Control": "no-cache",
+        "Host": "www.splitwise.com",
+        "accept-encoding": "gzip, deflate",
+        "Connection": "keep-alive",
+    }
+
+    splitwise_api_caller = APICall(url, header=headers, params=params)
+    groups = json.loads(splitwise_api_caller.make_api_call())["groups"]
+    groups_df = pd.DataFrame(groups).loc[:, ['id', 'name', 'group_type']].fillna('other').set_index('name')
+    groups_df.to_csv(expense_groups_file)
+    return groups_df
 
 
 def get_exchange_rates(
@@ -346,6 +370,9 @@ def main():
         params["root_path"] + params["expense_categories_file"],
         start_date=params["start_date"],
     )
+
+    get_expense_groups(params["splitwise_token"],
+                       params["root_path"] + params["expense_groups_file"])
 
 
 if __name__ == "__main__":

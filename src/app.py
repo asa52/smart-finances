@@ -112,7 +112,7 @@ def main(expenses_df: pd.DataFrame):
 
     # App layout
     app.layout = dbc.Container(tabs, fluid=True)
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
 
 
 @callback(

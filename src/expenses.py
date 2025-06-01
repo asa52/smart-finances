@@ -4,9 +4,8 @@ import json
 import re
 from datetime import date, datetime, timedelta
 from os.path import isfile
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import argparse
-from pprint import pprint
 
 import pandas as pd
 
@@ -42,7 +41,7 @@ def get_expense_groups(token: str, expense_groups_file: str) -> pd.DataFrame:
     https://secure.splitwise.com/oauth_clients/1459."""
 
     url = "https://www.splitwise.com/api/v3.0/get_groups"
-    params = {}
+    params: Dict[str, str] = {}
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "*/*",
@@ -54,7 +53,12 @@ def get_expense_groups(token: str, expense_groups_file: str) -> pd.DataFrame:
 
     splitwise_api_caller = APICall(url, header=headers, params=params)
     groups = json.loads(splitwise_api_caller.make_api_call())["groups"]
-    groups_df = pd.DataFrame(groups).loc[:, ['id', 'name', 'group_type']].fillna('other').set_index('name')
+    groups_df = (
+        pd.DataFrame(groups)
+        .loc[:, ["id", "name", "group_type"]]
+        .fillna("other")
+        .set_index("name")
+    )
     groups_df.to_csv(expense_groups_file)
     return groups_df
 
@@ -120,6 +124,12 @@ def determine_account_from_details(details: pd.Series) -> pd.Series:
     details."""
     account_map = {True: "PayPal", False: "Current", None: "Current"}
     return details.str.contains("paypal", flags=re.IGNORECASE).map(account_map)
+
+
+def filter_tag(details: pd.Series, tag: str) -> pd.Series:
+    """Filter details column based on supplied tag."""
+    # tags = ['House', 'Delhi Trip 2025', 'Belfast 2025']
+    return details.str.contains(tag, flags=re.IGNORECASE)
 
 
 def convert_foreign_transactions(
@@ -371,8 +381,9 @@ def main():
         start_date=params["start_date"],
     )
 
-    get_expense_groups(params["splitwise_token"],
-                       params["root_path"] + params["expense_groups_file"])
+    get_expense_groups(
+        params["splitwise_token"], params["root_path"] + params["expense_groups_file"]
+    )
 
 
 if __name__ == "__main__":

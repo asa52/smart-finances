@@ -1,4 +1,5 @@
 """Test functions in apis.py"""
+
 import pytest
 
 from src import helpers, expenses, NoDataWarning

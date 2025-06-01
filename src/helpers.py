@@ -10,10 +10,10 @@ import yaml
 from src import DEFAULT_DATESTR_FORMAT, NoDataWarning
 
 
-def get_excel_table(excel_file_path: str, sheet_name: str,
-                    header: int = 2) -> pd.DataFrame:
-    excel_table = pd.read_excel(excel_file_path, sheet_name=sheet_name,
-                                header=header)
+def get_excel_table(
+    excel_file_path: str, sheet_name: str, header: int = 2
+) -> pd.DataFrame:
+    excel_table = pd.read_excel(excel_file_path, sheet_name=sheet_name, header=header)
     if len(excel_table.index) == 0:
         raise NoDataWarning(
             f"No data in excel workbook {excel_file_path}, sheet {sheet_name}"
@@ -105,9 +105,7 @@ def make_default_datestr_format(dt=None):
         try:
             date.fromisoformat(dt)
         except ValueError as exc:
-            raise ValueError(
-                "Date string dt must be in the format " "YYYY-MM-DD"
-            ) from exc
+            raise ValueError("Date string dt must be in the format YYYY-MM-DD") from exc
         return dt
     elif isinstance(dt, datetime):
         return dt.date().strftime(DEFAULT_DATESTR_FORMAT)

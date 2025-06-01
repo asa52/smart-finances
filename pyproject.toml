@@ -1,31 +1,23 @@
-[tool.poetry]
+[project]
 name = "smart-finances"
 version = "0.1.0"
 description = "Aggregate data from various expense and investment APIs to see all your finances succinctly."
 authors = ["Abhishek Ambekar <a-ambekar@hotmail.co.uk>"]
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-pandas = "^2.2.1"
-pyyaml = "^6.0"
-requests = "^2.28.2"
-pytest = "^7.3.1"
-sqlalchemy = "^2.0.15"
-pytest-mock = "^3.10.0"
-pytest-benchmark = "^4.0.0"
-dash = "^2.16.1"
-dash-bootstrap-components = "^1.4.2"
-dash-bootstrap-templates = "^1.0.8"
-pylint = "^2.17.5"
-dash-auth = "^2.0.0"
-mypy = "^1.4.1"
-pandas-stubs = "^2.0.2.230605"
-types-pyyaml = "^6.0.12.11"
-types-requests = "^2.31.0.2"
-black = "^24.3.0"
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires-python = ">=3.13"
+dependencies = [
+    "dash>=3.0.4",
+    "dash-auth>=2.3.0",
+    "dash-bootstrap-components>=2.0.3",
+    "dash-bootstrap-templates>=2.1.0",
+    "mypy>=1.16.0",
+    "openpyxl>=3.1.5",
+    "pandas>=2.2.3",
+    "pip>=25.1.1",
+    "pytest>=8.3.5",
+    "pytest-benchmark>=5.1.0",
+    "pytest-mock>=3.14.1",
+    "pyyaml>=6.0.2",
+    "requests>=2.32.3",
+    "sqlalchemy>=2.0.41",
+]

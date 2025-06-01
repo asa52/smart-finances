@@ -42,7 +42,7 @@ class APICall:
         self.__class__.NUM_API_CALLS += 1
         if response.status_code != 200:
             raise APICallError(
-                f"API call failed with the following error: " f"{response.reason}"
+                f"API call failed with the following error: {response.reason}"
             )
         return response.text
 

@@ -16,8 +16,7 @@ JOINER_CHAR = "/"
 DATE_COLUMN_TITLE = "Date"
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 DBC_CSS_TEMPLATE = (
-    "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-"
-    "templates@V1.0.2/dbc.min.css"
+    "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.2/dbc.min.css"
 )
 VALID_USERNAME_PASSWORD_PAIRS = {"admin": "password"}
 
@@ -112,7 +111,7 @@ def main(expenses_df: pd.DataFrame):
 
     # App layout
     app.layout = dbc.Container(tabs, fluid=True)
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host="0.0.0.0")
 
 
 @callback(
@@ -286,7 +285,7 @@ def update_expense_pivottable(
             "subcategory": "Category",
             "sub_subcategory": "Subcategory",
         },
-        range_y=[0, min(5000, max(add_row_totals.Total))]
+        range_y=[0, min(10000, max(add_row_totals.Total))],
     )
     relative_fig = px.area(
         **graph_format,
@@ -295,7 +294,7 @@ def update_expense_pivottable(
             "amount": "Expense / %",
             "subcategory": "Category",
             "sub_subcategory": "Subcategory",
-        }
+        },
     )
 
     return absolute_fig, relative_fig, expense_pivot, expense_list
@@ -303,9 +302,7 @@ def update_expense_pivottable(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "expenses_file", help="Path to CSV file specifying expenses"
-    )
+    parser.add_argument("expenses_file", help="Path to CSV file specifying expenses")
     data_file_path = parser.parse_args().expenses_file
 
     df = pd.read_csv(data_file_path)

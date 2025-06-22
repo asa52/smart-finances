@@ -126,12 +126,6 @@ def determine_account_from_details(details: pd.Series) -> pd.Series:
     return details.str.contains("paypal", flags=re.IGNORECASE).map(account_map)
 
 
-def filter_tag(details: pd.Series, tag: str) -> pd.Series:
-    """Filter details column based on supplied tag."""
-    # tags = ['House', 'Delhi Trip 2025', 'Belfast 2025']
-    return details.str.contains(tag, flags=re.IGNORECASE)
-
-
 def convert_foreign_transactions(
     transactions: pd.DataFrame,
     forex_api_token: str,

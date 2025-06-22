@@ -1,11 +1,14 @@
 """Define the dashboard app layout."""
 
 import argparse
+import os
+import re
 from collections import namedtuple
 from typing import Tuple, Iterable
 
 import dash_auth
 import dash_bootstrap_components as dbc
+import numpy as np
 import pandas as pd
 import plotly.express as px
 from dash import Dash, html, dash_table, callback, Output, Input, dcc
@@ -18,12 +21,12 @@ PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 DBC_CSS_TEMPLATE = (
     "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.2/dbc.min.css"
 )
-VALID_USERNAME_PASSWORD_PAIRS = {"admin": "password"}
+VALID_LOGIN = {'admin': 'password'}
 
 TimeGroupFormats = namedtuple(
-    "TimeGroupFormats", ["weekly", "monthly", "quarterly", "yearly"]
+    "TimeGroupFormats", ["weekly", "monthly", "quarterly", "yearly", "all_time"]
 )
-TIME_MENU = TimeGroupFormats("Week", "Month", "Quarter", "Year")
+TIME_MENU = TimeGroupFormats("Week", "Month", "Quarter", "Year", "All time")
 EXPENSE_CATEGORY_OPTIONS = pd.DataFrame(
     index=["by_category", "by_subcategory"],
     columns=["option_name", "df_column_name"],
@@ -31,9 +34,9 @@ EXPENSE_CATEGORY_OPTIONS = pd.DataFrame(
 )
 
 
-def main(expenses_df: pd.DataFrame):
+def main(expense_groups: pd.DataFrame):
     app = Dash(__name__, external_stylesheets=[dbc.themes.MATERIA, DBC_CSS_TEMPLATE])
-    _ = dash_auth.BasicAuth(app, VALID_USERNAME_PASSWORD_PAIRS)
+    _ = dash_auth.BasicAuth(app, VALID_LOGIN)
 
     expenses_tab_content = dbc.Card(
         dbc.CardBody(
@@ -58,9 +61,15 @@ def main(expenses_df: pd.DataFrame):
                             clearable=False,
                         ),
                         dcc.Dropdown(
-                            [*expenses_df.group_id.unique(), "-"],
+                            [*sorted(expense_groups.name), "-"],
                             "-",
-                            id="filter-menu",
+                            id="expense-group-menu",
+                            clearable=False,
+                        ),
+                        dcc.Dropdown(
+                            ["-", *['House', 'Delhi Trip 2025', 'Belfast 2025']],
+                            "-",
+                            id="tag-menu",
                             clearable=False,
                         ),
                     ]
@@ -121,16 +130,18 @@ def main(expenses_df: pd.DataFrame):
     Output(component_id="expense-list", component_property="children"),
     Input(component_id="time-grouping-menu", component_property="value"),
     Input(component_id="expense-category-menu", component_property="value"),
-    Input(component_id="filter-menu", component_property="value"),
+    Input(component_id="expense-group-menu", component_property="value"),
+    Input(component_id="tag-menu", component_property="value"),
 )
 def update_expense_pivottable(
-    time_grouping_format: str, expense_category_format: str, filter_by_group: str
+        time_grouping_format: str, expense_category_format: str, filter_by_group: str, filter_by_tag: str
 ) -> Tuple[Figure, Figure, dash_table.DataTable, dash_table.DataTable]:
     """Callback to update expense graphs and tables based on dropdowns.
     @param time_grouping_format: One of valid TIME_GROUP_FORMATS.
     @param expense_category_format: Either Category or Subcategory,
     indicating how to summarise expenses.
     @param filter_by_group: Which expense group to filter by.
+    @param filter_by_tag: Which tag to filter by.
     @return: Updated DataTable
     """
     date_string_format = {
@@ -138,15 +149,24 @@ def update_expense_pivottable(
         TIME_MENU.monthly: "%Y-%b",
         TIME_MENU.quarterly: "%Y-Q",
         TIME_MENU.yearly: "%Y",
+        TIME_MENU.all_time: "All time",
+    }
+
+    grouping_frequency_format = {
+        TIME_MENU.weekly: 'W',
+        TIME_MENU.monthly: 'ME',
+        TIME_MENU.quarterly: 'QE',
+        TIME_MENU.yearly: 'YE',
+        TIME_MENU.all_time: '100YS',
     }
 
     groupings = [
-        pd.Grouper(key=DATE_COLUMN_TITLE, freq=time_grouping_format[0]),
+        pd.Grouper(key=DATE_COLUMN_TITLE, freq=grouping_frequency_format[time_grouping_format]),
         EXPENSE_CATEGORY_OPTIONS.loc["by_category", "df_column_name"],
     ]
     if (
-        expense_category_format
-        == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
+            expense_category_format
+            == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
     ):
         groupings.append(
             EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "df_column_name"]
@@ -155,9 +175,20 @@ def update_expense_pivottable(
     else:
         levels = (1,)
 
-    filtered_expenses = (
-        df if filter_by_group == "-" else df.loc[df.group_id == filter_by_group]
-    )
+    if filter_by_group == "-" and filter_by_tag == "-":
+        filtered_expenses = expenses
+    elif filter_by_group != "-" and filter_by_tag == "-":
+        selected_group_id = int(expense_groups.loc[expense_groups.name == filter_by_group, 'id'])
+        filtered_expenses = expenses.loc[expenses.group_id == selected_group_id]
+    elif filter_by_group == "-" and filter_by_tag != "-":
+        filtered_expenses = expenses.loc[expenses.details.fillna("").str.contains(filter_by_tag, flags=re.IGNORECASE)]
+    else:
+        selected_group_id = int(expense_groups.loc[expense_groups.name == filter_by_group, 'id'])
+        filtered_expenses = expenses.loc[
+            np.logical_and(expenses.group_id == selected_group_id,
+                           expenses.details.fillna("").str.contains(filter_by_tag, flags=re.IGNORECASE))
+        ]
+
     aggregated_expenses = filtered_expenses.groupby(groupings)["amount"].sum()
     df_for_graphs = aggregated_expenses.reset_index()
     aggregated_expenses_pivoted = (
@@ -175,8 +206,8 @@ def update_expense_pivottable(
         ).map(str)
     else:
         add_row_totals[DATE_COLUMN_TITLE] = add_row_totals.loc[
-            :, DATE_COLUMN_TITLE
-        ].dt.strftime(date_string_format[time_grouping_format])
+                                            :, DATE_COLUMN_TITLE
+                                            ].dt.strftime(date_string_format[time_grouping_format])
 
     def join_columns(column_names: Iterable[str]) -> str:
         return (
@@ -191,8 +222,8 @@ def update_expense_pivottable(
         # tuples of length 2. The 2nd element in the DATE_COLUMN_TITLE column
         # name will be empty.
         if (
-            expense_category_format
-            == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
+                expense_category_format
+                == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
         ):
             column_details = {"name": column_name, "id": join_columns(column_name)}
             if column_name[0] != DATE_COLUMN_TITLE:
@@ -215,8 +246,8 @@ def update_expense_pivottable(
         column_formats.append(column_details)
 
     if (
-        expense_category_format
-        == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
+            expense_category_format
+            == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
     ):
         add_row_totals.columns = add_row_totals.columns.map(join_columns)
 
@@ -225,15 +256,15 @@ def update_expense_pivottable(
             date=filtered_expenses[DATE_COLUMN_TITLE].dt.strftime("%Y-%m-%d")
         )
         .loc[
-            :,
-            [
-                "date",
-                "description",
-                "amount",
-                "subcategory",
-                "sub_subcategory",
-                "group_id",
-            ],
+        :,
+        [
+            "date",
+            "description",
+            "amount",
+            "subcategory",
+            "sub_subcategory",
+            "group_id",
+        ],
         ]
         .rename(
             columns=dict(
@@ -263,8 +294,8 @@ def update_expense_pivottable(
         data=expenses_df.to_dict("records"), **table_format
     )
     if (
-        expense_category_format
-        == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
+            expense_category_format
+            == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
     ):
         color = EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "df_column_name"]
     else:
@@ -285,7 +316,7 @@ def update_expense_pivottable(
             "subcategory": "Category",
             "sub_subcategory": "Subcategory",
         },
-        range_y=[0, min(10000, max(add_row_totals.Total))],
+        range_y=[0, min(10000, max(add_row_totals.Total, default=10000))],
     )
     relative_fig = px.area(
         **graph_format,
@@ -303,12 +334,17 @@ def update_expense_pivottable(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("expenses_file", help="Path to CSV file specifying expenses")
-    data_file_path = parser.parse_args().expenses_file
+    parser.add_argument("expense_groups_file", help="Path to CSV file specifying expense groups")
+    parsed = parser.parse_args()
 
-    df = pd.read_csv(data_file_path)
-    df = df.assign(date=pd.to_datetime(df.date)).rename(
+    expenses_file_path = parsed.expenses_file
+    expense_groups_file_path = parsed.expense_groups_file
+
+    expenses = pd.read_csv(expenses_file_path)
+    expense_groups = pd.read_csv(expense_groups_file_path)
+    expenses = expenses.assign(date=pd.to_datetime(expenses.date)).rename(
         columns={"date": DATE_COLUMN_TITLE}
     )
-    main(df)
+    main(expense_groups)
     # todo pie chart with sliding date scale
     # todo conditional formatting for pivot table

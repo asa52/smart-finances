@@ -120,7 +120,7 @@ def main(expense_groups: pd.DataFrame):
 
     # App layout
     app.layout = dbc.Container(tabs, fluid=True)
-    app.run(debug=True, host="0.0.0.0")
+    app.run(host="0.0.0.0")
 
 
 @callback(

@@ -316,7 +316,7 @@ def update_expense_pivottable(
             "subcategory": "Category",
             "sub_subcategory": "Subcategory",
         },
-        range_y=[0, min(10000, max(add_row_totals.Total, default=10000))],
+        range_y=[0, add_row_totals.Total],
     )
     relative_fig = px.area(
         **graph_format,

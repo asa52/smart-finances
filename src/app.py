@@ -21,7 +21,7 @@ PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 DBC_CSS_TEMPLATE = (
     "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.2/dbc.min.css"
 )
-VALID_LOGIN = {'admin': 'password'}
+VALID_LOGIN = {os.environ.get('SMART_FINANCE_USERNAME'): os.environ.get('SMART_FINANCE_PASSWORD')}
 
 TimeGroupFormats = namedtuple(
     "TimeGroupFormats", ["weekly", "monthly", "quarterly", "yearly", "all_time"]
@@ -67,7 +67,7 @@ def main(expense_groups: pd.DataFrame):
                             clearable=False,
                         ),
                         dcc.Dropdown(
-                            ["-", *['House', 'Delhi Trip 2025', 'Belfast 2025']],
+                            ["-", *['House', 'Delhi Trip 2025', 'Belfast 2025', 'Iceland 2025', 'Rome 2025']],
                             "-",
                             id="tag-menu",
                             clearable=False,

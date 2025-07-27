@@ -4,7 +4,8 @@ import argparse
 import os
 import re
 from collections import namedtuple
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, Optional
+from dotenv import load_dotenv
 
 import dash_auth
 import dash_bootstrap_components as dbc
@@ -13,15 +14,16 @@ import pandas as pd
 import plotly.express as px
 from dash import Dash, html, dash_table, callback, Output, Input, dcc
 from dash.dash_table.Format import Format, Group, Scheme, Symbol
-from plotly.graph_objects import Figure
 
+load_dotenv()
 JOINER_CHAR = "/"
 DATE_COLUMN_TITLE = "Date"
 PLOTLY_LOGO = "https://images.plot.ly/logo/new-branding/plotly-logomark.png"
 DBC_CSS_TEMPLATE = (
     "https://cdn.jsdelivr.net/gh/AnnMarieW/dash-bootstrap-templates@V1.0.2/dbc.min.css"
 )
-VALID_LOGIN = {os.environ.get('SMART_FINANCE_USERNAME'): os.environ.get('SMART_FINANCE_PASSWORD')}
+SECRET_KEY = os.getenv('SMART_FINANCE_SECRET_KEY')
+VALID_LOGIN = {os.getenv('SMART_FINANCE_USERNAME'): os.getenv('SMART_FINANCE_PASSWORD')}
 
 TimeGroupFormats = namedtuple(
     "TimeGroupFormats", ["weekly", "monthly", "quarterly", "yearly", "all_time"]
@@ -36,7 +38,7 @@ EXPENSE_CATEGORY_OPTIONS = pd.DataFrame(
 
 def main(expense_groups: pd.DataFrame):
     app = Dash(__name__, external_stylesheets=[dbc.themes.MATERIA, DBC_CSS_TEMPLATE])
-    _ = dash_auth.BasicAuth(app, VALID_LOGIN)
+    _ = dash_auth.BasicAuth(app, username_password_list=VALID_LOGIN, secret_key=SECRET_KEY)
 
     expenses_tab_content = dbc.Card(
         dbc.CardBody(
@@ -46,75 +48,77 @@ def main(expense_groups: pd.DataFrame):
                         "Expenses Breakdown", className="text-primary text-center fs-3"
                     )
                 ),
-                dbc.Row(
-                    [
-                        dcc.Dropdown(
+                dbc.Row(html.H4('Options')),
+                dbc.Row(html.H6('Time grouping format')),
+                dbc.Row(dcc.Dropdown(
                             TIME_MENU,
                             TIME_MENU.monthly,
                             id="time-grouping-menu",
-                            clearable=False,
-                        ),
+                            clearable=False)),
+                dbc.Row(html.Br()),
+
+                dbc.Row(html.H6('Expense category grouping')),
+                dbc.Row(
                         dcc.Dropdown(
                             EXPENSE_CATEGORY_OPTIONS.option_name,
                             EXPENSE_CATEGORY_OPTIONS.loc["by_category", "option_name"],
                             id="expense-category-menu",
                             clearable=False,
-                        ),
-                        dcc.Dropdown(
+                        )),
+                dbc.Row(html.Br()),
+
+                dbc.Row(html.H6('Expense group filter')),
+                dbc.Row(dcc.Dropdown(
                             [*sorted(expense_groups.name), "-"],
                             "-",
                             id="expense-group-menu",
                             clearable=False,
-                        ),
-                        dcc.Dropdown(
+                        )),
+                dbc.Row(html.Br()),
+
+                dbc.Row(html.H6('Filter by tag')),
+                dbc.Row(dcc.Dropdown(
                             ["-", *['House', 'Delhi Trip 2025', 'Belfast 2025', 'Iceland 2025', 'Rome 2025']],
                             "-",
                             id="tag-menu",
                             clearable=False,
-                        ),
-                    ]
-                ),
-                dbc.Row(
-                    [
-                        dbc.Col(dcc.Graph(figure={}, id="absolute-expenses-graph")),
-                        dbc.Col(dcc.Graph(figure={}, id="relative-expenses-graph")),
-                    ]
-                ),
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            html.Div(
-                                id="expense-category-pivot",
-                                className="dbc-row-selectable",
-                            )
-                        ),
-                        dbc.Col(
-                            html.Div(id="expense-list", className="dbc-row-selectable")
-                        ),
-                    ]
-                ),
+                        )),
+                dbc.Row(html.Br()),
+
+                dbc.Row(html.Div(id='graph-title')),
+                dbc.Row(html.Div(id="absolute-expenses-graph-container")),
+                dbc.Row(html.Br()),
+                dbc.Row(html.Div(id="relative-expenses-graph-container")),
+                dbc.Row(html.Br()),
+
+                dbc.Row(html.H4('Categorised expense totals')),
+                dbc.Row(html.Div(id="expense-category-pivot", className="dbc-row-selectable")),
+                dbc.Row(html.Br()),
+
+                dbc.Row(html.H4('Full expense list')),
+                dbc.Row(html.Div(id="expense-list", className="dbc-row-selectable")),
             ]
         ),
         className="mt-3",
     )
 
-    income_tab_content = dbc.Card(
-        dbc.CardBody(
-            [
-                dbc.Row(
-                    html.H1(
-                        "Income Breakdown", className="text-primary text-center fs-3"
-                    )
-                ),
-            ]
-        ),
-        className="mt-3",
-    )
+    #income_tab_content = dbc.Card(
+    #    dbc.CardBody(
+    #        [
+    #            dbc.Row(
+    #                html.H1(
+    #                    "Income Breakdown", className="text-primary text-center fs-3"
+    #                )
+    #            ),
+    #        ]
+    #    ),
+    #    className="mt-3",
+    #)
 
     tabs = dbc.Tabs(
         [
             dbc.Tab(expenses_tab_content, label="Expenses"),
-            dbc.Tab(income_tab_content, label="Income"),
+            #dbc.Tab(income_tab_content, label="Income"),
         ]
     )
 
@@ -124,10 +128,11 @@ def main(expense_groups: pd.DataFrame):
 
 
 @callback(
-    Output(component_id="absolute-expenses-graph", component_property="figure"),
-    Output(component_id="relative-expenses-graph", component_property="figure"),
+    Output(component_id="absolute-expenses-graph-container", component_property="children"),
+    Output(component_id="relative-expenses-graph-container", component_property="children"),
     Output(component_id="expense-category-pivot", component_property="children"),
     Output(component_id="expense-list", component_property="children"),
+    Output(component_id='graph-title', component_property="children"),
     Input(component_id="time-grouping-menu", component_property="value"),
     Input(component_id="expense-category-menu", component_property="value"),
     Input(component_id="expense-group-menu", component_property="value"),
@@ -135,7 +140,7 @@ def main(expense_groups: pd.DataFrame):
 )
 def update_expense_pivottable(
         time_grouping_format: str, expense_category_format: str, filter_by_group: str, filter_by_tag: str
-) -> Tuple[Figure, Figure, dash_table.DataTable, dash_table.DataTable]:
+) -> Tuple[Optional[dcc.Graph], Optional[dcc.Graph], dash_table.DataTable, dash_table.DataTable, Optional[html.H4]]:
     """Callback to update expense graphs and tables based on dropdowns.
     @param time_grouping_format: One of valid TIME_GROUP_FORMATS.
     @param expense_category_format: Either Category or Subcategory,
@@ -309,26 +314,34 @@ def update_expense_pivottable(
         "hover_name": "Date",
         "hover_data": "amount",
     }
-    absolute_fig = px.area(
-        **graph_format,
-        labels={
-            "amount": "Expense / £",
-            "subcategory": "Category",
-            "sub_subcategory": "Subcategory",
-        },
-        range_y=[0, add_row_totals.Total],
-    )
-    relative_fig = px.area(
-        **graph_format,
-        groupnorm="percent",
-        labels={
-            "amount": "Expense / %",
-            "subcategory": "Category",
-            "sub_subcategory": "Subcategory",
-        },
-    )
+    if time_grouping_format == TIME_MENU.all_time:
+        absolute_fig = None
+        relative_fig = None
+        graph_title = None
+    else:
+        absolute_fig = dcc.Graph(figure=px.area(
+            **graph_format,
+            labels={
+                "amount": "Expense / £",
+                "subcategory": "Category",
+                "sub_subcategory": "Subcategory",
+            },
+            range_y=[0, add_row_totals.Total],
+            title='Absolute expenditure'
+        ))
+        relative_fig = dcc.Graph(figure=px.area(
+            **graph_format,
+            groupnorm="percent",
+            labels={
+                "amount": "Expense / %",
+                "subcategory": "Category",
+                "sub_subcategory": "Subcategory",
+            },
+            title='Percentage expenditure'
+        ))
+        graph_title = html.H4('Expenses against time')
 
-    return absolute_fig, relative_fig, expense_pivot, expense_list
+    return absolute_fig, relative_fig, expense_pivot, expense_list, graph_title
 
 
 if __name__ == "__main__":

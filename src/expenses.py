@@ -228,6 +228,7 @@ def update_exchange_rate_records(
             .currency_code.apply(list)
             .reset_index()
         )
+
         # Obtain a list of rates relative to the default for each date. Note
         # that row.currency_code is a *list* of currencies.
         rates_list = forex_requests.apply(

@@ -383,7 +383,7 @@ def update_expense_pivottable(
         "y": "amount",
         "line_group": "subcategory",
         "color": color,
-        "hover_name": "date",
+        "hover_name": "Date",
         "hover_data": "amount",
     }
     if time_grouping_format == TIME_MENU.all_time:

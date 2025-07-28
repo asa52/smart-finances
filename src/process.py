@@ -66,7 +66,7 @@ def get_dates_union(inputs_table, funds):
     unique_funds_dates = set()
     for _, fund in funds.items():
         unique_funds_dates = unique_funds_dates.union(fund.unit_price_history_df.Date)
-    extra_fund_dates = unique_funds_dates - unique_input_dates
+    unique_funds_dates - unique_input_dates
     return sorted(inputs_dates)
 
 

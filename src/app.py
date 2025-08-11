@@ -8,10 +8,12 @@ from typing import Tuple, Iterable, Optional
 from dotenv import load_dotenv
 
 import dash_auth
+from datetime import datetime
 import dash_bootstrap_components as dbc
 import numpy as np
 import pandas as pd
 import plotly.express as px
+from src import DEFAULT_START_DATE, DEFAULT_DATESTR_FORMAT
 from dash import Dash, html, dash_table, callback, Output, Input, dcc, State
 from dash.dash_table.Format import Format, Group, Scheme, Symbol
 from pathlib import Path
@@ -59,6 +61,9 @@ def main(expenses_path: str, expense_groups_path: str):
                     )
                 ),
                 dbc.Row(html.H4("Options")),
+                dbc.Row(html.H6("Date range")),
+                dbc.Row(dcc.DatePickerRange(id='date-range', min_date_allowed=DEFAULT_START_DATE, max_date_allowed=datetime.now(),
+                                            start_date=DEFAULT_START_DATE, end_date=f'{datetime.now():{DEFAULT_DATESTR_FORMAT}}', display_format='DD-MMM-YYYY', first_day_of_week=1, show_outside_days=True)),
                 dbc.Row(html.H6("Time grouping format")),
                 dbc.Row(
                     dcc.Dropdown(
@@ -149,7 +154,7 @@ def main(expenses_path: str, expense_groups_path: str):
 
     # App layout
     app.layout = dbc.Container(tabs, fluid=True)
-    app.run(host="0.0.0.0")
+    app.run()
 
 
 @callback(
@@ -167,6 +172,8 @@ def main(expenses_path: str, expense_groups_path: str):
     Input(component_id="expense-category-menu", component_property="value"),
     Input(component_id="expense-group-menu", component_property="value"),
     Input(component_id="tag-menu", component_property="value"),
+    Input(component_id='date-range', component_property='start_date'),
+    Input(component_id='date-range', component_property='end_date'),
     State(component_id="file-paths", component_property="data"),
 )
 def update_expense_pivottable(
@@ -174,6 +181,8 @@ def update_expense_pivottable(
     expense_category_format: str,
     filter_by_group: str,
     filter_by_tag: str,
+    start_date: str,
+    end_date: str,
     file_paths: dict[str, Path],
 ) -> Tuple[
     Optional[dcc.Graph],
@@ -193,9 +202,14 @@ def update_expense_pivottable(
     """
     expenses = pd.read_csv(file_paths["expenses_path"])
     expense_groups = pd.read_csv(file_paths["expense_groups_path"])
+    # Filter by selected dates
+    start_date, end_date = [datetime.strptime(date_str, DEFAULT_DATESTR_FORMAT) for date_str in [start_date, end_date]]
     expenses = expenses.assign(date=pd.to_datetime(expenses.date)).rename(
         columns={"date": DATE_COLUMN_TITLE}
     )
+    expenses = expenses.loc[(start_date <= expenses[DATE_COLUMN_TITLE]) & (expenses[DATE_COLUMN_TITLE] <= end_date), :]
+
+
     expense_group_names = ["-", *sorted(expense_groups.name)]
     date_string_format = {
         TIME_MENU.weekly: "%Y-W%W",

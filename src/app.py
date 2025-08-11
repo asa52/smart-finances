@@ -62,8 +62,19 @@ def main(expenses_path: str, expense_groups_path: str):
                 ),
                 dbc.Row(html.H4("Options")),
                 dbc.Row(html.H6("Date range")),
-                dbc.Row(dcc.DatePickerRange(id='date-range', min_date_allowed=DEFAULT_START_DATE, max_date_allowed=datetime.now(),
-                                            start_date=DEFAULT_START_DATE, end_date=f'{datetime.now():{DEFAULT_DATESTR_FORMAT}}', display_format='DD-MMM-YYYY', first_day_of_week=1, show_outside_days=True)),
+                dbc.Row(
+                    dcc.DatePickerRange(
+                        id="date-range",
+                        min_date_allowed=DEFAULT_START_DATE,
+                        max_date_allowed=datetime.now(),
+                        start_date=DEFAULT_START_DATE,
+                        end_date=f"{datetime.now():{DEFAULT_DATESTR_FORMAT}}",
+                        display_format="DD-MMM-YYYY",
+                        first_day_of_week=1,
+                        show_outside_days=True,
+                    )
+                ),
+                dbc.Row(html.Br()),
                 dbc.Row(html.H6("Time grouping format")),
                 dbc.Row(
                     dcc.Dropdown(
@@ -114,8 +125,10 @@ def main(expenses_path: str, expense_groups_path: str):
                 ),
                 dbc.Row(html.Br()),
                 dbc.Row(html.Div(id="graph-title")),
+                dbc.Row(html.Div(id="absolute-graph-title")),
                 dbc.Row(html.Div(id="absolute-expenses-graph-container")),
                 dbc.Row(html.Br()),
+                dbc.Row(html.Div(id="relative-graph-title")),
                 dbc.Row(html.Div(id="relative-expenses-graph-container")),
                 dbc.Row(html.Br()),
                 dbc.Row(html.H4("Categorised expense totals")),
@@ -167,13 +180,15 @@ def main(expenses_path: str, expense_groups_path: str):
     Output(component_id="expense-category-pivot", component_property="children"),
     Output(component_id="expense-list", component_property="children"),
     Output(component_id="graph-title", component_property="children"),
+    Output(component_id="absolute-graph-title", component_property="children"),
+    Output(component_id="relative-graph-title", component_property="children"),
     Output(component_id="expense-group-menu", component_property="options"),
     Input(component_id="time-grouping-menu", component_property="value"),
     Input(component_id="expense-category-menu", component_property="value"),
     Input(component_id="expense-group-menu", component_property="value"),
     Input(component_id="tag-menu", component_property="value"),
-    Input(component_id='date-range', component_property='start_date'),
-    Input(component_id='date-range', component_property='end_date'),
+    Input(component_id="date-range", component_property="start_date"),
+    Input(component_id="date-range", component_property="end_date"),
     State(component_id="file-paths", component_property="data"),
 )
 def update_expense_pivottable(
@@ -190,6 +205,8 @@ def update_expense_pivottable(
     dash_table.DataTable,
     dash_table.DataTable,
     Optional[html.H4],
+    Optional[html.H6],
+    Optional[html.H6],
     list[str],
 ]:
     """Callback to update expense graphs and tables based on dropdowns.
@@ -203,12 +220,18 @@ def update_expense_pivottable(
     expenses = pd.read_csv(file_paths["expenses_path"])
     expense_groups = pd.read_csv(file_paths["expense_groups_path"])
     # Filter by selected dates
-    start_date, end_date = [datetime.strptime(date_str, DEFAULT_DATESTR_FORMAT) for date_str in [start_date, end_date]]
+    start_date, end_date = [
+        datetime.strptime(date_str, DEFAULT_DATESTR_FORMAT)
+        for date_str in [start_date, end_date]
+    ]
     expenses = expenses.assign(date=pd.to_datetime(expenses.date)).rename(
         columns={"date": DATE_COLUMN_TITLE}
     )
-    expenses = expenses.loc[(start_date <= expenses[DATE_COLUMN_TITLE]) & (expenses[DATE_COLUMN_TITLE] <= end_date), :]
-
+    expenses = expenses.loc[
+        (start_date <= expenses[DATE_COLUMN_TITLE])
+        & (expenses[DATE_COLUMN_TITLE] <= end_date),
+        :,
+    ]
 
     expense_group_names = ["-", *sorted(expense_groups.name)]
     date_string_format = {
@@ -404,32 +427,43 @@ def update_expense_pivottable(
         absolute_fig = None
         relative_fig = None
         graph_title = None
+        absolute_graph_title = None
+        relative_graph_title = None
     else:
-        absolute_fig = dcc.Graph(
-            figure=px.area(
-                **graph_format,
-                labels={
-                    "amount": "Expense / £",
-                    "subcategory": "Category",
-                    "sub_subcategory": "Subcategory",
-                },
-                range_y=[0, add_row_totals.Total],
-                title="Absolute expenditure",
-            )
+        absolute_area = px.area(
+            **graph_format,
+            labels={
+                "amount": "Expense / £",
+                "subcategory": "Category",
+                "sub_subcategory": "Subcategory",
+            },
+            # range_y=[0, add_row_totals.Total],
         )
-        relative_fig = dcc.Graph(
-            figure=px.area(
-                **graph_format,
-                groupnorm="percent",
-                labels={
-                    "amount": "Expense / %",
-                    "subcategory": "Category",
-                    "sub_subcategory": "Subcategory",
-                },
-                title="Percentage expenditure",
-            )
+        absolute_area.update_layout(
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
+            ),
         )
+        absolute_fig = dcc.Graph(figure=absolute_area)
+        relative_area = px.area(
+            **graph_format,
+            groupnorm="percent",
+            labels={
+                "amount": "Expense / %",
+                "subcategory": "Category",
+                "sub_subcategory": "Subcategory",
+            },
+        )
+        relative_area.update_layout(
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
+            ),
+        )
+
+        relative_fig = dcc.Graph(figure=relative_area)
         graph_title = html.H4("Expenses against time")
+        absolute_graph_title = html.H6("Absolute expenditure")
+        relative_graph_title = html.H6("Relative expenditure")
 
     return (
         absolute_fig,
@@ -437,6 +471,8 @@ def update_expense_pivottable(
         expense_pivot,
         expense_list,
         graph_title,
+        absolute_graph_title,
+        relative_graph_title,
         expense_group_names,
     )
 

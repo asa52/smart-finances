@@ -492,8 +492,6 @@ def update_expense_pivottable(
         **table_format,
     )
 
-    print(EXPENSE_CATEGORY_OPTIONS.loc[:, "option_name"] == expense_category_format)
-
     legend_series = EXPENSE_CATEGORY_OPTIONS.loc[
         EXPENSE_CATEGORY_OPTIONS.loc[:, "option_name"] == expense_category_format,
         "df_column_name",

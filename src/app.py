@@ -162,7 +162,7 @@ def main(expenses_path: str, expense_groups_path: str):
 
     # App layout
     app.layout = dbc.Container(tabs, fluid=True)
-    app.run()
+    app.run(host="0.0.0.0")
 
 
 def filter_expenses_by_date_range(

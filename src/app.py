@@ -38,133 +38,6 @@ EXPENSE_CATEGORY_OPTIONS = pd.DataFrame(
 )
 
 
-def expense_options(expense_group_names: list[str]) -> list[dbc.Row]:
-    """Return a list of options objects to control which expenses are displayed."""
-    tags = ["House", "Delhi Trip 2025", "Belfast 2025", "Iceland 2025", "Rome 2025"]
-    date_today = datetime.now()
-    return [
-        dbc.Row(html.H4("Options")),
-        dbc.Row(html.H5("Filters")),
-        dbc.Row(html.H6("Date range")),
-        dbc.Row(
-            dcc.DatePickerRange(
-                id="date-range",
-                min_date_allowed=DEFAULT_START_DATE,
-                max_date_allowed=date_today,
-                start_date=f"{date_today - timedelta(days=365.25 * 2):{DEFAULT_DATESTR_FORMAT}}",
-                end_date=f"{date_today:{DEFAULT_DATESTR_FORMAT}}",
-                display_format="DD-MMM-YYYY",
-                first_day_of_week=1,
-                show_outside_days=True,
-            )
-        ),
-        dbc.Row(html.Br()),
-        dbc.Row(html.H6("Expense categories / sub-categories")),
-        dcc.Dropdown(
-            options=[],
-            value=[],
-            id="expense-category-multi-select",
-            multi=True,
-            searchable=True,
-            clearable=False,
-        ),
-        dbc.Row(html.Br()),
-        dbc.Row(html.H6("Expense groups")),
-        dbc.Row(
-            dcc.Dropdown(
-                options=expense_group_names,
-                value=expense_group_names,
-                id="expense-group-menu",
-                clearable=False,
-                multi=True,
-            )
-        ),
-        dbc.Row(html.Br()),
-        dbc.Row(html.H6("Tags")),
-        dbc.Row(
-            dcc.Dropdown(
-                options=tags, value=[], id="tag-menu", clearable=True, multi=True
-            )
-        ),
-        dbc.Row(html.Br()),
-        dbc.Row(html.H5("Groupings")),
-        dbc.Row(html.H6("By time")),
-        dbc.Row(
-            dcc.Dropdown(
-                options=TIME_MENU,
-                value=TIME_MENU.monthly,
-                id="time-grouping-menu",
-                clearable=False,
-            )
-        ),
-        dbc.Row(html.Br()),
-        dbc.Row(html.H6("By expense categorisation")),
-        dbc.Row(
-            dcc.Dropdown(
-                options=EXPENSE_CATEGORY_OPTIONS.option_name,
-                value=EXPENSE_CATEGORY_OPTIONS.loc["by_category", "option_name"],
-                id="expense-categorisation-format-menu",
-                clearable=False,
-            )
-        ),
-        dbc.Row(html.Br()),
-    ]
-
-
-def main(expenses_path: str, expense_groups_path: str):
-    app = Dash(__name__, external_stylesheets=[dbc.themes.MATERIA, DBC_CSS_TEMPLATE])
-    _ = dash_auth.BasicAuth(
-        app, username_password_list=VALID_LOGIN, secret_key=SECRET_KEY
-    )
-    expense_group_names = sorted(pd.read_csv(expense_groups_path).name)
-    expenses_tab_content = dbc.Card(
-        dbc.CardBody(
-            [
-                dcc.Store(
-                    id="file-paths",
-                    data={
-                        "expenses_path": expenses_path,
-                        "expense_groups_path": expense_groups_path,
-                    },
-                ),
-                dbc.Row(
-                    html.H1(
-                        "Expenses Breakdown", className="text-primary text-center fs-3"
-                    )
-                ),
-                *expense_options(expense_group_names),
-                dbc.Row(html.Div(id="graph-title")),
-                dbc.Row(html.Div(id="absolute-graph-title")),
-                dbc.Row(html.Div(id="absolute-expenses-graph-container")),
-                dbc.Row(html.Br()),
-                dbc.Row(html.Div(id="relative-graph-title")),
-                dbc.Row(html.Div(id="relative-expenses-graph-container")),
-                dbc.Row(html.Br()),
-                dbc.Row(html.H4("Categorised expense totals")),
-                dbc.Row(
-                    html.Div(
-                        id="expense-category-pivot", className="dbc-row-selectable"
-                    )
-                ),
-                dbc.Row(html.Br()),
-                dbc.Row(html.H4("Full expense list")),
-                dbc.Row(html.Div(id="expense-list", className="dbc-row-selectable")),
-            ]
-        ),
-        className="mt-3",
-    )
-
-    tabs = dbc.Tabs(
-        [
-            dbc.Tab(expenses_tab_content, label="Expenses"),
-        ]
-    )
-
-    # App layout
-    app.layout = dbc.Container(tabs, fluid=True)
-    app.run(host="0.0.0.0")
-
-
 def filter_expenses_by_date_range(
     expenses: pd.DataFrame, start_date_str: str, end_date_str: str
 ) -> pd.DataFrame:
@@ -222,6 +95,34 @@ def filter_expenses_by_categorisation(
     return expenses.loc[expenses[column_to_filter].isin(selected_options)]
 
 
+def area_plot(df: pd.DataFrame, color: str, groupnorm: Optional[str]) -> dcc.Graph:
+    """Create area plot."""
+    graph_format = {
+        "data_frame": df,
+        "x": DATE_COLUMN_TITLE,
+        "y": "amount",
+        "line_group": "subcategory",
+        "color": color,
+        "hover_name": "Date",
+        "hover_data": "amount",
+        "labels": {
+            "amount": "Expense / %",
+            "subcategory": "Category",
+            "sub_subcategory": "Subcategory",
+        },
+    }
+    area = px.area(
+        **graph_format,
+        groupnorm=groupnorm,
+    )
+    area.update_layout(
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        xaxis={"fixedrange": True},
+    )
+    area_graph = dcc.Graph(figure=area)
+    return area_graph
+
+
 @callback(
     Output(component_id="expense-category-multi-select", component_property="options"),
     Output(component_id="expense-category-multi-select", component_property="value"),
@@ -255,34 +156,6 @@ def update_selected_expense_categories(
     return expense_categories, expense_categories
 
 
-def area_plot(df: pd.DataFrame, color: str, groupnorm: Optional[str]) -> dcc.Graph:
-    """Create area plot."""
-    graph_format = {
-        "data_frame": df,
-        "x": DATE_COLUMN_TITLE,
-        "y": "amount",
-        "line_group": "subcategory",
-        "color": color,
-        "hover_name": "Date",
-        "hover_data": "amount",
-        "labels": {
-            "amount": "Expense / %",
-            "subcategory": "Category",
-            "sub_subcategory": "Subcategory",
-        },
-    }
-    area = px.area(
-        **graph_format,
-        groupnorm=groupnorm,
-    )
-    area.update_layout(
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        xaxis={"fixedrange": True},
-    )
-    area_graph = dcc.Graph(figure=area)
-    return area_graph
-
-
 @callback(
     Output(
         component_id="absolute-expenses-graph-container", component_property="children"
@@ -296,6 +169,7 @@ def area_plot(df: pd.DataFrame, color: str, groupnorm: Optional[str]) -> dcc.Gra
     Output(component_id="absolute-graph-title", component_property="children"),
     Output(component_id="relative-graph-title", component_property="children"),
     Output(component_id="expense-group-menu", component_property="options"),
+    Output(component_id="tag-menu", component_property="options"),
     Input(component_id="time-grouping-menu", component_property="value"),
     Input(
         component_id="expense-categorisation-format-menu", component_property="value"
@@ -316,7 +190,7 @@ def update_expense_pivottable(
     end_date: str,
     selected_expense_categories: list[str],
     file_paths: dict[str, Path],
-) -> Tuple[
+) -> tuple[
     Optional[dcc.Graph],
     Optional[dcc.Graph],
     dash_table.DataTable,
@@ -325,10 +199,12 @@ def update_expense_pivottable(
     Optional[html.H6],
     Optional[html.H6],
     list[str],
+    list[str],
 ]:
     """Callback to update expense graphs and tables based on dropdowns."""
     expenses = pd.read_csv(file_paths["expenses_path"])
     expense_groups = pd.read_csv(file_paths["expense_groups_path"]).astype({"id": int})
+    tags = pd.read_csv(file_paths["tags_path"])['Tags'].tolist()
 
     date_filtered_expenses = filter_expenses_by_date_range(
         expenses, start_date, end_date
@@ -519,19 +395,150 @@ def update_expense_pivottable(
         absolute_graph_title,
         relative_graph_title,
         expense_group_names,
+        tags,
     )
+
+
+def expense_options(expense_group_names: list[str]) -> list[dbc.Row]:
+    """Return a list of options objects to control which expenses are displayed."""
+    date_today = datetime.now()
+    return [
+        dbc.Row(html.H4("Options")),
+        dbc.Row(html.H5("Filters")),
+        dbc.Row(html.H6("Date range")),
+        dbc.Row(
+            dcc.DatePickerRange(
+                id="date-range",
+                min_date_allowed=DEFAULT_START_DATE,
+                max_date_allowed=date_today,
+                start_date=f"{date_today - timedelta(days=365.25 * 2):{DEFAULT_DATESTR_FORMAT}}",
+                end_date=f"{date_today:{DEFAULT_DATESTR_FORMAT}}",
+                display_format="DD-MMM-YYYY",
+                first_day_of_week=1,
+                show_outside_days=True,
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("Expense categories / sub-categories")),
+        dcc.Dropdown(
+            options=[],
+            value=[],
+            id="expense-category-multi-select",
+            multi=True,
+            searchable=True,
+            clearable=False,
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("Expense groups")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=expense_group_names,
+                value=expense_group_names,
+                id="expense-group-menu",
+                clearable=False,
+                multi=True,
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("Tags")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=[], value=[], id="tag-menu", clearable=True, multi=True
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H5("Groupings")),
+        dbc.Row(html.H6("By time")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=TIME_MENU,
+                value=TIME_MENU.monthly,
+                id="time-grouping-menu",
+                clearable=False,
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("By expense categorisation")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=EXPENSE_CATEGORY_OPTIONS.option_name,
+                value=EXPENSE_CATEGORY_OPTIONS.loc["by_category", "option_name"],
+                id="expense-categorisation-format-menu",
+                clearable=False,
+            )
+        ),
+        dbc.Row(html.Br()),
+    ]
+
+
+def main(expenses_path: str, expense_groups_path: str, tags_path: str) -> None:
+    app = Dash(__name__, external_stylesheets=[dbc.themes.MATERIA, DBC_CSS_TEMPLATE])
+    _ = dash_auth.BasicAuth(
+        app, username_password_list=VALID_LOGIN, secret_key=SECRET_KEY
+    )
+    expense_group_names = sorted(pd.read_csv(expense_groups_path).name)
+    expenses_tab_content = dbc.Card(
+        dbc.CardBody(
+            [
+                dcc.Store(
+                    id="file-paths",
+                    data={
+                        "expenses_path": expenses_path,
+                        "expense_groups_path": expense_groups_path,
+                        "tags_path": tags_path,
+                    },
+                ),
+                dbc.Row(
+                    html.H1(
+                        "Expenses Breakdown", className="text-primary text-center fs-3"
+                    )
+                ),
+                *expense_options(expense_group_names),
+                dbc.Row(html.Div(id="graph-title")),
+                dbc.Row(html.Div(id="absolute-graph-title")),
+                dbc.Row(html.Div(id="absolute-expenses-graph-container")),
+                dbc.Row(html.Br()),
+                dbc.Row(html.Div(id="relative-graph-title")),
+                dbc.Row(html.Div(id="relative-expenses-graph-container")),
+                dbc.Row(html.Br()),
+                dbc.Row(html.H4("Categorised expense totals")),
+                dbc.Row(
+                    html.Div(
+                        id="expense-category-pivot", className="dbc-row-selectable"
+                    )
+                ),
+                dbc.Row(html.Br()),
+                dbc.Row(html.H4("Full expense list")),
+                dbc.Row(html.Div(id="expense-list", className="dbc-row-selectable")),
+            ]
+        ),
+        className="mt-3",
+    )
+
+    tabs = dbc.Tabs(
+        [
+            dbc.Tab(expenses_tab_content, label="Expenses"),
+        ]
+    )
+
+    # App layout
+    app.layout = dbc.Container(tabs, fluid=True)
+    app.run(host="0.0.0.0")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("expenses_file", help="Path to CSV file specifying expenses")
     parser.add_argument(
-        "expense_groups_file", help="Path to CSV file specifying expense groups"
+        "expense_groups_file", help="Path to CSV file specifying expense groups")
+    parser.add_argument(
+        "tags_file", help="Path to CSV file specifying tags"
     )
     parsed = parser.parse_args()
 
     expenses_file_path = parsed.expenses_file
     expense_groups_file_path = parsed.expense_groups_file
+    tags_file_path = parsed.tags_file
 
-    main(expenses_file_path, expense_groups_file_path)
+    main(expenses_file_path, expense_groups_file_path, tags_file_path)
     # todo conditional formatting for pivot table

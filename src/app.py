@@ -8,9 +8,8 @@ from typing import Tuple, Iterable, Optional
 from dotenv import load_dotenv
 
 import dash_auth
-from datetime import datetime
+from datetime import datetime, timedelta
 import dash_bootstrap_components as dbc
-import numpy as np
 import pandas as pd
 import plotly.express as px
 from src import DEFAULT_START_DATE, DEFAULT_DATESTR_FORMAT
@@ -39,6 +38,79 @@ EXPENSE_CATEGORY_OPTIONS = pd.DataFrame(
 )
 
 
+def expense_options(expense_group_names: list[str]) -> list[dbc.Row]:
+    """Return a list of options objects to control which expenses are displayed."""
+    tags = ["House", "Delhi Trip 2025", "Belfast 2025", "Iceland 2025", "Rome 2025"]
+    date_today = datetime.now()
+    return [
+        dbc.Row(html.H4("Options")),
+        dbc.Row(html.H5("Filters")),
+        dbc.Row(html.H6("Date range")),
+        dbc.Row(
+            dcc.DatePickerRange(
+                id="date-range",
+                min_date_allowed=DEFAULT_START_DATE,
+                max_date_allowed=date_today,
+                start_date=f"{date_today - timedelta(days=365.25 * 2):{DEFAULT_DATESTR_FORMAT}}",
+                end_date=f"{date_today:{DEFAULT_DATESTR_FORMAT}}",
+                display_format="DD-MMM-YYYY",
+                first_day_of_week=1,
+                show_outside_days=True,
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("Expense categories / sub-categories")),
+        dcc.Dropdown(
+            options=[],
+            value=[],
+            id="expense-category-multi-select",
+            multi=True,
+            searchable=True,
+            clearable=False,
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("Expense groups")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=expense_group_names,
+                value=expense_group_names,
+                id="expense-group-menu",
+                clearable=False,
+                multi=True,
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("Tags")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=tags, value=[], id="tag-menu", clearable=True, multi=True
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H5("Groupings")),
+        dbc.Row(html.H6("By time")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=TIME_MENU,
+                value=TIME_MENU.monthly,
+                id="time-grouping-menu",
+                clearable=False,
+            )
+        ),
+        dbc.Row(html.Br()),
+        dbc.Row(html.H6("By expense categorisation")),
+        dbc.Row(
+            dcc.Dropdown(
+                options=EXPENSE_CATEGORY_OPTIONS.option_name,
+                value=EXPENSE_CATEGORY_OPTIONS.loc["by_category", "option_name"],
+                id="expense-categorisation-format-menu",
+                clearable=False,
+            )
+        ),
+        dbc.Row(html.Br()),
+    ]
+
+
 def main(expenses_path: str, expense_groups_path: str):
     app = Dash(__name__, external_stylesheets=[dbc.themes.MATERIA, DBC_CSS_TEMPLATE])
     _ = dash_auth.BasicAuth(
@@ -60,70 +132,7 @@ def main(expenses_path: str, expense_groups_path: str):
                         "Expenses Breakdown", className="text-primary text-center fs-3"
                     )
                 ),
-                dbc.Row(html.H4("Options")),
-                dbc.Row(html.H6("Date range")),
-                dbc.Row(
-                    dcc.DatePickerRange(
-                        id="date-range",
-                        min_date_allowed=DEFAULT_START_DATE,
-                        max_date_allowed=datetime.now(),
-                        start_date=DEFAULT_START_DATE,
-                        end_date=f"{datetime.now():{DEFAULT_DATESTR_FORMAT}}",
-                        display_format="DD-MMM-YYYY",
-                        first_day_of_week=1,
-                        show_outside_days=True,
-                    )
-                ),
-                dbc.Row(html.Br()),
-                dbc.Row(html.H6("Time grouping format")),
-                dbc.Row(
-                    dcc.Dropdown(
-                        TIME_MENU,
-                        TIME_MENU.monthly,
-                        id="time-grouping-menu",
-                        clearable=False,
-                    )
-                ),
-                dbc.Row(html.Br()),
-                dbc.Row(html.H6("Expense category grouping")),
-                dbc.Row(
-                    dcc.Dropdown(
-                        EXPENSE_CATEGORY_OPTIONS.option_name,
-                        EXPENSE_CATEGORY_OPTIONS.loc["by_category", "option_name"],
-                        id="expense-category-menu",
-                        clearable=False,
-                    )
-                ),
-                dbc.Row(html.Br()),
-                dbc.Row(html.H6("Expense group filter")),
-                dbc.Row(
-                    dcc.Dropdown(
-                        ["-", *expense_group_names],
-                        "-",
-                        id="expense-group-menu",
-                        clearable=False,
-                    )
-                ),
-                dbc.Row(html.Br()),
-                dbc.Row(html.H6("Filter by tag")),
-                dbc.Row(
-                    dcc.Dropdown(
-                        [
-                            "-",
-                            *[
-                                "House",
-                                "Delhi Trip 2025",
-                                "Belfast 2025",
-                                "Iceland 2025",
-                                "Rome 2025",
-                            ],
-                        ],
-                        "-",
-                        id="tag-menu",
-                        clearable=False,
-                    )
-                ),
-                dbc.Row(html.Br()),
+                *expense_options(expense_group_names),
                 dbc.Row(html.Div(id="graph-title")),
                 dbc.Row(html.Div(id="absolute-graph-title")),
                 dbc.Row(html.Div(id="absolute-expenses-graph-container")),
@@ -145,29 +154,133 @@ def main(expenses_path: str, expense_groups_path: str):
         className="mt-3",
     )
 
-    # income_tab_content = dbc.Card(
-    #    dbc.CardBody(
-    #        [
-    #            dbc.Row(
-    #                html.H1(
-    #                    "Income Breakdown", className="text-primary text-center fs-3"
-    #                )
-    #            ),
-    #        ]
-    #    ),
-    #    className="mt-3",
-    # )
-
     tabs = dbc.Tabs(
         [
             dbc.Tab(expenses_tab_content, label="Expenses"),
-            # dbc.Tab(income_tab_content, label="Income"),
         ]
     )
 
     # App layout
     app.layout = dbc.Container(tabs, fluid=True)
     app.run()
+
+
+def filter_expenses_by_date_range(
+    expenses: pd.DataFrame, start_date_str: str, end_date_str: str
+) -> pd.DataFrame:
+    """Filter for expenses that occur between start_date and end_date inclusive."""
+    # Filter by selected dates
+    start_date = datetime.strptime(start_date_str, DEFAULT_DATESTR_FORMAT)
+    end_date = datetime.strptime(end_date_str, DEFAULT_DATESTR_FORMAT)
+
+    with_datetime_column = expenses.assign(date=pd.to_datetime(expenses.date)).rename(
+        columns={"date": DATE_COLUMN_TITLE}
+    )
+    return with_datetime_column.loc[
+        (start_date <= with_datetime_column[DATE_COLUMN_TITLE])
+        & (with_datetime_column[DATE_COLUMN_TITLE] <= end_date),
+        :,
+    ]
+
+
+def filter_expenses_by_groups(
+    expenses: pd.DataFrame,
+    expense_groups: pd.DataFrame,
+    selected_group_name: Iterable[str],
+) -> pd.DataFrame:
+    """Filter expenses by the group they belong to."""
+    selected_group_ids = set(
+        expense_groups.loc[expense_groups.name == name, "id"].iloc[0]
+        for name in selected_group_name
+    )
+    return expenses.loc[expenses.group_id.isin(selected_group_ids)]
+
+
+def filter_expenses_by_tags(
+    expenses: pd.DataFrame, selected_tags: Iterable[str]
+) -> pd.DataFrame:
+    """Filter expenses by any chosen tags. If no tags are selected, return all expenses."""
+    if not selected_tags:
+        return expenses
+    else:
+        tags_pattern = r"|".join(selected_tags)
+        return expenses.loc[
+            expenses.details.fillna("").str.contains(
+                tags_pattern, regex=True, flags=re.IGNORECASE
+            )
+        ]
+
+
+def filter_expenses_by_categorisation(
+    expenses: pd.DataFrame, categorisation_format: str, selected_options: Iterable[str]
+) -> pd.DataFrame:
+    """Filter expenses by category or subcategory depending on the chosen categorisation_format."""
+    assert categorisation_format in EXPENSE_CATEGORY_OPTIONS.option_name.values
+    column_to_filter = EXPENSE_CATEGORY_OPTIONS.loc[
+        EXPENSE_CATEGORY_OPTIONS.option_name == categorisation_format, "df_column_name"
+    ].to_list()[0]
+    return expenses.loc[expenses[column_to_filter].isin(selected_options)]
+
+
+@callback(
+    Output(component_id="expense-category-multi-select", component_property="options"),
+    Output(component_id="expense-category-multi-select", component_property="value"),
+    Input(
+        component_id="expense-categorisation-format-menu", component_property="value"
+    ),
+    State(component_id="file-paths", component_property="data"),
+)
+def update_selected_expense_categories(
+    expense_category_format: str, file_paths: dict[str, Path]
+) -> tuple[list[str], list[str]]:
+    """When the expense categorisation format is changed, update the available expense categories selected
+    and available to be selected."""
+
+    expenses = pd.read_csv(file_paths["expenses_path"])
+    if (
+        expense_category_format
+        == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
+    ):
+        expense_categories = sorted(
+            expenses[
+                EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "df_column_name"]
+            ].unique()
+        )
+    else:
+        expense_categories = sorted(
+            expenses[
+                EXPENSE_CATEGORY_OPTIONS.loc["by_category", "df_column_name"]
+            ].unique()
+        )
+    return expense_categories, expense_categories
+
+
+def area_plot(df: pd.DataFrame, color: str, groupnorm: Optional[str]) -> dcc.Graph:
+    """Create area plot."""
+    graph_format = {
+        "data_frame": df,
+        "x": DATE_COLUMN_TITLE,
+        "y": "amount",
+        "line_group": "subcategory",
+        "color": color,
+        "hover_name": "Date",
+        "hover_data": "amount",
+        "labels": {
+            "amount": "Expense / %",
+            "subcategory": "Category",
+            "sub_subcategory": "Subcategory",
+        },
+    }
+    area = px.area(
+        **graph_format,
+        groupnorm=groupnorm,
+    )
+    area.update_layout(
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        xaxis={"fixedrange": True},
+    )
+    area_graph = dcc.Graph(figure=area)
+    return area_graph
 
 
 @callback(
@@ -184,20 +297,24 @@ def main(expenses_path: str, expense_groups_path: str):
     Output(component_id="relative-graph-title", component_property="children"),
     Output(component_id="expense-group-menu", component_property="options"),
     Input(component_id="time-grouping-menu", component_property="value"),
-    Input(component_id="expense-category-menu", component_property="value"),
+    Input(
+        component_id="expense-categorisation-format-menu", component_property="value"
+    ),
     Input(component_id="expense-group-menu", component_property="value"),
     Input(component_id="tag-menu", component_property="value"),
     Input(component_id="date-range", component_property="start_date"),
     Input(component_id="date-range", component_property="end_date"),
+    Input(component_id="expense-category-multi-select", component_property="value"),
     State(component_id="file-paths", component_property="data"),
 )
 def update_expense_pivottable(
     time_grouping_format: str,
     expense_category_format: str,
-    filter_by_group: str,
-    filter_by_tag: str,
+    filter_by_group: list[str],
+    filter_by_tag: list[str],
     start_date: str,
     end_date: str,
+    selected_expense_categories: list[str],
     file_paths: dict[str, Path],
 ) -> Tuple[
     Optional[dcc.Graph],
@@ -209,31 +326,22 @@ def update_expense_pivottable(
     Optional[html.H6],
     list[str],
 ]:
-    """Callback to update expense graphs and tables based on dropdowns.
-    @param time_grouping_format: One of valid TIME_GROUP_FORMATS.
-    @param expense_category_format: Either Category or Subcategory,
-    indicating how to summarise expenses.
-    @param filter_by_group: Which expense group to filter by.
-    @param filter_by_tag: Which tag to filter by.
-    @return: Updated DataTable
-    """
+    """Callback to update expense graphs and tables based on dropdowns."""
     expenses = pd.read_csv(file_paths["expenses_path"])
-    expense_groups = pd.read_csv(file_paths["expense_groups_path"])
-    # Filter by selected dates
-    start_date, end_date = [
-        datetime.strptime(date_str, DEFAULT_DATESTR_FORMAT)
-        for date_str in [start_date, end_date]
-    ]
-    expenses = expenses.assign(date=pd.to_datetime(expenses.date)).rename(
-        columns={"date": DATE_COLUMN_TITLE}
-    )
-    expenses = expenses.loc[
-        (start_date <= expenses[DATE_COLUMN_TITLE])
-        & (expenses[DATE_COLUMN_TITLE] <= end_date),
-        :,
-    ]
+    expense_groups = pd.read_csv(file_paths["expense_groups_path"]).astype({"id": int})
 
-    expense_group_names = ["-", *sorted(expense_groups.name)]
+    date_filtered_expenses = filter_expenses_by_date_range(
+        expenses, start_date, end_date
+    )
+    filtered_expenses = filter_expenses_by_groups(
+        date_filtered_expenses, expense_groups, filter_by_group
+    )
+    filtered_expenses = filter_expenses_by_tags(filtered_expenses, filter_by_tag)
+    filtered_expenses = filter_expenses_by_categorisation(
+        filtered_expenses, expense_category_format, selected_expense_categories
+    )
+
+    expense_group_names = sorted(expense_groups.name)
     date_string_format = {
         TIME_MENU.weekly: "%Y-W%W",
         TIME_MENU.monthly: "%Y-%b",
@@ -267,30 +375,6 @@ def update_expense_pivottable(
     else:
         levels = (1,)
 
-    if filter_by_group == "-" and filter_by_tag == "-":
-        filtered_expenses = expenses
-    elif filter_by_group != "-" and filter_by_tag == "-":
-        selected_group_id = int(
-            expense_groups.loc[expense_groups.name == filter_by_group, "id"]
-        )
-        filtered_expenses = expenses.loc[expenses.group_id == selected_group_id]
-    elif filter_by_group == "-" and filter_by_tag != "-":
-        filtered_expenses = expenses.loc[
-            expenses.details.fillna("").str.contains(filter_by_tag, flags=re.IGNORECASE)
-        ]
-    else:
-        selected_group_id = int(
-            expense_groups.loc[expense_groups.name == filter_by_group, "id"]
-        )
-        filtered_expenses = expenses.loc[
-            np.logical_and(
-                expenses.group_id == selected_group_id,
-                expenses.details.fillna("").str.contains(
-                    filter_by_tag, flags=re.IGNORECASE
-                ),
-            )
-        ]
-
     aggregated_expenses = filtered_expenses.groupby(groupings)["amount"].sum()
     df_for_graphs = aggregated_expenses.reset_index()
     aggregated_expenses_pivoted = (
@@ -311,7 +395,7 @@ def update_expense_pivottable(
             :, DATE_COLUMN_TITLE
         ].dt.strftime(date_string_format[time_grouping_format])
 
-    def join_columns(column_names: Iterable[str]) -> str:
+    def join_columns(column_names: list[str]) -> str:
         return (
             column_names[0]
             if column_names[-1] == ""
@@ -370,6 +454,7 @@ def update_expense_pivottable(
                 "name",
             ],
         ]
+        .sort_values("date", ascending=False)
     )
 
     category_column_formats = [
@@ -407,63 +492,25 @@ def update_expense_pivottable(
         **table_format,
     )
 
-    if (
-        expense_category_format
-        == EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "option_name"]
-    ):
-        color = EXPENSE_CATEGORY_OPTIONS.loc["by_subcategory", "df_column_name"]
-    else:
-        color = EXPENSE_CATEGORY_OPTIONS.loc["by_category", "df_column_name"]
-    graph_format = {
-        "data_frame": df_for_graphs,
-        "x": DATE_COLUMN_TITLE,
-        "y": "amount",
-        "line_group": "subcategory",
-        "color": color,
-        "hover_name": "Date",
-        "hover_data": "amount",
-    }
+    print(EXPENSE_CATEGORY_OPTIONS.loc[:, "option_name"] == expense_category_format)
+
+    legend_series = EXPENSE_CATEGORY_OPTIONS.loc[
+        EXPENSE_CATEGORY_OPTIONS.loc[:, "option_name"] == expense_category_format,
+        "df_column_name",
+    ].iloc[0]
+
     if time_grouping_format == TIME_MENU.all_time:
-        absolute_fig = None
-        relative_fig = None
         graph_title = None
         absolute_graph_title = None
+        absolute_fig = None
         relative_graph_title = None
+        relative_fig = None
     else:
-        absolute_area = px.area(
-            **graph_format,
-            labels={
-                "amount": "Expense / £",
-                "subcategory": "Category",
-                "sub_subcategory": "Subcategory",
-            },
-            # range_y=[0, add_row_totals.Total],
-        )
-        absolute_area.update_layout(
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
-            ),
-        )
-        absolute_fig = dcc.Graph(figure=absolute_area)
-        relative_area = px.area(
-            **graph_format,
-            groupnorm="percent",
-            labels={
-                "amount": "Expense / %",
-                "subcategory": "Category",
-                "sub_subcategory": "Subcategory",
-            },
-        )
-        relative_area.update_layout(
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5
-            ),
-        )
-
-        relative_fig = dcc.Graph(figure=relative_area)
         graph_title = html.H4("Expenses against time")
         absolute_graph_title = html.H6("Absolute expenditure")
+        absolute_fig = area_plot(df_for_graphs, color=legend_series, groupnorm=None)
         relative_graph_title = html.H6("Relative expenditure")
+        relative_fig = area_plot(df_for_graphs, color=legend_series, groupnorm="percent")
 
     return (
         absolute_fig,
@@ -489,5 +536,4 @@ if __name__ == "__main__":
     expense_groups_file_path = parsed.expense_groups_file
 
     main(expenses_file_path, expense_groups_file_path)
-    # todo pie chart with sliding date scale
     # todo conditional formatting for pivot table
